@@ -1,0 +1,86 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Calendar, ChevronDown, ChevronUp, Clock, Dumbbell as DumbbellIcon } from "lucide-react";
+import { WORKOUT_HISTORY, type Workout } from "@/data/mockData";
+import { format, parseISO } from "date-fns";
+
+const History = () => {
+  const navigate = useNavigate();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const toggle = (id: string) => setExpandedId(expandedId === id ? null : id);
+
+  const totalVolume = (w: Workout) =>
+    w.exercises.reduce(
+      (sum, ex) => sum + ex.sets.reduce((s, set) => s + set.weight * set.reps, 0),
+      0
+    );
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <div className="mx-auto max-w-md">
+        <header className="px-5 pt-6 pb-4">
+          <h1 className="font-display text-2xl font-bold text-foreground">Workout History</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{WORKOUT_HISTORY.length} workouts logged</p>
+        </header>
+
+        <div className="flex flex-col gap-3 px-5">
+          {WORKOUT_HISTORY.map((w) => (
+            <div key={w.id} className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+              <button
+                onClick={() => navigate(`/workout/${w.id}`)}
+                className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-secondary/30"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15">
+                    <Calendar className="h-4 w-4 text-accent" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{w.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(parseISO(w.date), "MMM d, yyyy")} · {w.duration}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-foreground">{w.exercises.length} exercises</p>
+                    <p className="text-[10px] text-muted-foreground">{totalVolume(w).toLocaleString()} lbs vol</p>
+                  </div>
+                  {expandedId === w.id ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              </button>
+
+              {expandedId === w.id && (
+                <div className="border-t border-border bg-secondary/20 px-4 py-3 space-y-3">
+                  {w.exercises.map((ex, i) => (
+                    <div key={i}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <DumbbellIcon className="h-3.5 w-3.5 text-accent" />
+                        <span className="text-xs font-semibold text-foreground">{ex.name}</span>
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
+                      </div>
+                      <div className="ml-5.5 space-y-0.5">
+                        {ex.sets.map((set, j) => (
+                          <p key={j} className="text-xs text-muted-foreground">
+                            Set {j + 1}: <span className="font-medium text-foreground">{set.weight} lbs</span> × <span className="font-medium text-foreground">{set.reps} reps</span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default History;
