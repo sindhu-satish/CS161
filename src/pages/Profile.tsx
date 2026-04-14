@@ -1,13 +1,15 @@
 import { useState } from "react";
 import {
   User, Target, Ruler, Bell, Moon, ChevronRight, LogOut,
-  Edit3, Camera, Check, X, Timer, Volume2, Vibrate,
-  Shield, HelpCircle, Star, Share2, Trash2, Download
+  Edit3, Camera, Check, Timer, Volume2, Vibrate,
+  HelpCircle, Star, Share2, Trash2, Download
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/context/AuthContext";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { getWorkouts } from "@/lib/storage";
 
 type SettingsPanel = null | "profile" | "goal" | "unit" | "notifications" | "timer" | "about";
 
@@ -26,17 +28,12 @@ const UNITS = [
 
 const Profile = () => {
   const { theme, toggle } = useTheme();
+  const { user, logout, updateProfile } = useAuth();
   const [activePanel, setActivePanel] = useState<SettingsPanel>(null);
 
-  // User state
-  const [userName, setUserName] = useState("Alex Johnson");
-  const [userEmail, setUserEmail] = useState("alex@fittrack.pro");
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
 
-  // Settings state
-  const [goal, setGoal] = useState("build-muscle");
-  const [unit, setUnit] = useState("lbs");
   const [restTimerDuration, setRestTimerDuration] = useState(90);
   const [restTimerSound, setRestTimerSound] = useState(true);
   const [restTimerVibrate, setRestTimerVibrate] = useState(true);
@@ -45,21 +42,17 @@ const Profile = () => {
   const [notifWeeklySummary, setNotifWeeklySummary] = useState(true);
   const [notifRestDay, setNotifRestDay] = useState(false);
 
-  const memberSince = "January 2026";
-  const totalWorkouts = 47;
-
-  const currentGoal = GOALS.find((g) => g.id === goal)?.label || "Build Muscle";
-  const currentUnit = UNITS.find((u) => u.id === unit)?.label || "Pounds (lbs)";
+  const totalWorkouts = getWorkouts().length;
+  const currentGoal = GOALS.find((g) => g.id === (user?.goal || "build-muscle"))?.label || "Build Muscle";
 
   const openEditProfile = () => {
-    setEditName(userName);
-    setEditEmail(userEmail);
+    setEditName(user?.name || "");
+    setEditEmail(user?.email || "");
     setActivePanel("profile");
   };
 
   const saveProfile = () => {
-    if (editName.trim()) setUserName(editName.trim());
-    if (editEmail.trim()) setUserEmail(editEmail.trim());
+    if (editName.trim()) updateProfile({ name: editName.trim() });
     setActivePanel(null);
   };
 
@@ -91,8 +84,8 @@ const Profile = () => {
                 </button>
               </div>
               <div>
-                <h2 className="font-display text-lg font-bold text-background">{userName}</h2>
-                <p className="text-sm text-muted-foreground">{userEmail}</p>
+                <h2 className="font-display text-lg font-bold text-background">{user?.name}</h2>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
               </div>
             </div>
             <button
@@ -110,7 +103,7 @@ const Profile = () => {
             <div className="h-10 w-px bg-background/10" />
             <div>
               <p className="text-sm font-medium text-background">Member since</p>
-              <p className="text-xs text-muted-foreground">{memberSince}</p>
+              <p className="text-xs text-muted-foreground">{user?.memberSince}</p>
             </div>
           </div>
         </div>
@@ -142,7 +135,7 @@ const Profile = () => {
                 <span className="text-sm font-medium text-foreground">Weight Unit</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{unit}</span>
+                <span className="text-xs text-muted-foreground">{user?.unit || "lbs"}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </button>
@@ -207,7 +200,6 @@ const Profile = () => {
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
-
             <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30">
               <div className="flex items-center gap-3">
                 <Share2 className="h-4 w-4 text-muted-foreground" />
@@ -215,7 +207,6 @@ const Profile = () => {
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
-
             <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30">
               <div className="flex items-center gap-3">
                 <Star className="h-4 w-4 text-muted-foreground" />
@@ -223,7 +214,6 @@ const Profile = () => {
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
-
             <button
               onClick={() => setActivePanel("about")}
               className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
@@ -240,7 +230,10 @@ const Profile = () => {
         {/* Danger Zone */}
         <section className="px-5 mb-5">
           <div className="flex flex-col gap-2.5">
-            <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 py-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5">
+            <button
+              onClick={logout}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 py-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
+            >
               <LogOut className="h-4 w-4" />
               Sign Out
             </button>
@@ -254,7 +247,7 @@ const Profile = () => {
         <p className="text-center text-[10px] text-muted-foreground pb-4">FitTrack Pro v1.0.0</p>
       </div>
 
-      {/* ========== EDIT PROFILE DIALOG ========== */}
+      {/* EDIT PROFILE DIALOG */}
       <Dialog open={activePanel === "profile"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -262,16 +255,6 @@ const Profile = () => {
             <DialogDescription className="text-left text-xs">Update your personal information</DialogDescription>
           </DialogHeader>
           <div className="px-5 pb-5 space-y-4">
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary">
-                  <User className="h-8 w-8 text-primary-foreground" />
-                </div>
-                <button className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border shadow-sm">
-                  <Camera className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              </div>
-            </div>
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Name</label>
               <input
@@ -284,10 +267,10 @@ const Profile = () => {
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Email</label>
               <input
                 value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                type="email"
-                className="mt-1 h-11 w-full rounded-xl border border-border bg-secondary px-4 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                disabled
+                className="mt-1 h-11 w-full rounded-xl border border-border bg-secondary px-4 text-sm font-medium text-muted-foreground outline-none cursor-not-allowed"
               />
+              <p className="mt-1 text-[10px] text-muted-foreground">Email cannot be changed</p>
             </div>
             <div className="flex gap-2.5 pt-1">
               <button
@@ -307,7 +290,7 @@ const Profile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ========== FITNESS GOAL DIALOG ========== */}
+      {/* FITNESS GOAL DIALOG */}
       <Dialog open={activePanel === "goal"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -318,17 +301,15 @@ const Profile = () => {
             {GOALS.map((g) => (
               <button
                 key={g.id}
-                onClick={() => { setGoal(g.id); setActivePanel(null); }}
+                onClick={() => { updateProfile({ goal: g.id }); setActivePanel(null); }}
                 className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
-                  goal === g.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card hover:bg-secondary/50"
+                  user?.goal === g.id ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                 }`}
               >
                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  goal === g.id ? "bg-primary" : "bg-secondary"
+                  user?.goal === g.id ? "bg-primary" : "bg-secondary"
                 }`}>
-                  {goal === g.id ? (
+                  {user?.goal === g.id ? (
                     <Check className="h-4 w-4 text-primary-foreground" />
                   ) : (
                     <Target className="h-4 w-4 text-muted-foreground" />
@@ -344,7 +325,7 @@ const Profile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ========== WEIGHT UNIT DIALOG ========== */}
+      {/* WEIGHT UNIT DIALOG */}
       <Dialog open={activePanel === "unit"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -355,17 +336,15 @@ const Profile = () => {
             {UNITS.map((u) => (
               <button
                 key={u.id}
-                onClick={() => { setUnit(u.id); setActivePanel(null); }}
+                onClick={() => { updateProfile({ unit: u.id }); setActivePanel(null); }}
                 className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
-                  unit === u.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card hover:bg-secondary/50"
+                  user?.unit === u.id ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                 }`}
               >
                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  unit === u.id ? "bg-primary" : "bg-secondary"
+                  user?.unit === u.id ? "bg-primary" : "bg-secondary"
                 }`}>
-                  {unit === u.id ? (
+                  {user?.unit === u.id ? (
                     <Check className="h-4 w-4 text-primary-foreground" />
                   ) : (
                     <Ruler className="h-4 w-4 text-muted-foreground" />
@@ -381,7 +360,7 @@ const Profile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ========== REST TIMER DIALOG ========== */}
+      {/* REST TIMER DIALOG */}
       <Dialog open={activePanel === "timer"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -389,7 +368,6 @@ const Profile = () => {
             <DialogDescription className="text-left text-xs">Configure your between-sets rest timer</DialogDescription>
           </DialogHeader>
           <div className="px-5 pb-5 space-y-5">
-            {/* Duration */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Default Duration</label>
               <div className="mt-2 flex items-center gap-3">
@@ -398,12 +376,10 @@ const Profile = () => {
                     key={dur}
                     onClick={() => setRestTimerDuration(dur)}
                     className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition-colors ${
-                      restTimerDuration === dur
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-foreground hover:bg-border"
+                      restTimerDuration === dur ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-border"
                     }`}
                   >
-                    {dur < 60 ? `${dur}s` : `${dur / 60}m${dur % 60 ? dur % 60 : ""}`}
+                    {dur < 60 ? `${dur}s` : `${dur / 60}m`}
                   </button>
                 ))}
               </div>
@@ -411,8 +387,6 @@ const Profile = () => {
                 {Math.floor(restTimerDuration / 60)}:{(restTimerDuration % 60).toString().padStart(2, "0")}
               </p>
             </div>
-
-            {/* Sound */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Volume2 className="h-4 w-4 text-muted-foreground" />
@@ -423,8 +397,6 @@ const Profile = () => {
               </div>
               <Toggle on={restTimerSound} onToggle={() => setRestTimerSound(!restTimerSound)} />
             </div>
-
-            {/* Vibration */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Vibrate className="h-4 w-4 text-muted-foreground" />
@@ -435,7 +407,6 @@ const Profile = () => {
               </div>
               <Toggle on={restTimerVibrate} onToggle={() => setRestTimerVibrate(!restTimerVibrate)} />
             </div>
-
             <button
               onClick={() => setActivePanel(null)}
               className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
@@ -446,7 +417,7 @@ const Profile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ========== NOTIFICATIONS DIALOG ========== */}
+      {/* NOTIFICATIONS DIALOG */}
       <Dialog open={activePanel === "notifications"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -472,7 +443,7 @@ const Profile = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ========== ABOUT DIALOG ========== */}
+      {/* ABOUT DIALOG */}
       <Dialog open={activePanel === "about"} onOpenChange={(o) => !o && setActivePanel(null)}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-3">
@@ -480,32 +451,9 @@ const Profile = () => {
             <DialogDescription className="text-left text-xs">Your personal gym companion</DialogDescription>
           </DialogHeader>
           <div className="px-5 pb-5 space-y-4">
-            <div className="flex justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-                <span className="text-2xl">🏋️</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="font-display text-base font-bold text-foreground">FitTrack Pro</p>
-              <p className="text-xs text-muted-foreground">Version 1.0.0</p>
-            </div>
             <p className="text-xs text-muted-foreground text-center leading-relaxed">
               Track your workouts, monitor progress, and crush your fitness goals. Built for lifters who take their training seriously.
             </p>
-            <div className="rounded-xl border border-border bg-secondary/50 p-3.5 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Privacy Policy</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Terms of Service</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Open Source Licenses</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            </div>
             <button
               onClick={() => setActivePanel(null)}
               className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"

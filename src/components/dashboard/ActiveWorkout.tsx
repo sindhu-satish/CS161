@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Plus, X, Pause, Play, Square, ChevronDown } from "lucide-react";
+import { Search, Plus, X, Pause, Play, Square } from "lucide-react";
 import type { WorkoutPlan } from "./PlanWorkout";
+import { saveWorkout } from "@/lib/storage";
+import type { Workout } from "@/data/mockData";
 
 const EXERCISE_LIST = [
   "Bench Press", "Squat", "Deadlift", "Overhead Press", "Barbell Row",
@@ -17,14 +19,31 @@ interface SetEntry {
 
 interface LoggedExercise {
   name: string;
+  muscleGroup: string;
   sets: SetEntry[];
 }
+
+const MUSCLE_GROUP_MAP: Record<string, string> = {
+  "Bench Press": "Chest", "Incline Bench Press": "Chest", "Cable Fly": "Chest", "Push Up": "Chest",
+  "Squat": "Legs", "Romanian Deadlift": "Legs", "Leg Press": "Legs", "Lunges": "Legs", "Calf Raise": "Legs",
+  "Deadlift": "Back", "Barbell Row": "Back", "Pull Up": "Back", "Lat Pulldown": "Back",
+  "Overhead Press": "Shoulders", "Lateral Raise": "Shoulders", "Front Raise": "Shoulders", "Face Pull": "Shoulders",
+  "Dumbbell Curl": "Arms", "Hammer Curl": "Arms", "Tricep Dip": "Arms", "Skull Crusher": "Arms",
+  "Plank": "Core", "Cable Crunch": "Core", "Hanging Leg Raise": "Core",
+};
 
 const formatTime = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   return `${h > 0 ? `${h}:` : ""}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
+const formatDuration = (seconds: number) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m} min`;
 };
 
 interface ActiveWorkoutProps {
@@ -41,6 +60,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     if (plan) {
       return plan.exercises.map((ex) => ({
         name: ex.name,
+        muscleGroup: MUSCLE_GROUP_MAP[ex.name] || "Other",
         sets: ex.sets.map((s) => ({ weight: s.targetWeight, reps: s.targetReps, done: false })),
       }));
     }
@@ -62,7 +82,10 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
   );
 
   const addExercise = (name: string) => {
-    setExercises((prev) => [...prev, { name, sets: [{ weight: 0, reps: 0, done: false }] }]);
+    setExercises((prev) => [
+      ...prev,
+      { name, muscleGroup: MUSCLE_GROUP_MAP[name] || "Other", sets: [{ weight: 0, reps: 0, done: false }] },
+    ]);
     setShowSearch(false);
     setQuery("");
   };
@@ -103,6 +126,24 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     setExercises((prev) => prev.filter((_, i) => i !== exIdx));
   };
 
+  const handleFinish = () => {
+    if (exercises.length > 0) {
+      const workout: Workout = {
+        id: `w${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+        name: plan?.name || "Quick Workout",
+        duration: formatDuration(elapsed),
+        exercises: exercises.map((ex) => ({
+          name: ex.name,
+          muscleGroup: ex.muscleGroup,
+          sets: ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, done: s.done })),
+        })),
+      };
+      saveWorkout(workout);
+    }
+    onFinish();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-md">
@@ -127,7 +168,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                 )}
               </button>
               <button
-                onClick={onFinish}
+                onClick={handleFinish}
                 className="flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 font-display text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
               >
                 <Square className="h-3.5 w-3.5" />
@@ -146,19 +187,20 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
           {exercises.map((ex, exIdx) => (
             <div key={exIdx} className="rounded-xl border border-border bg-card shadow-sm">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <h4 className="text-sm font-semibold text-foreground">{ex.name}</h4>
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">{ex.name}</h4>
+                  <span className="text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
+                </div>
                 <button onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              {/* Sets header */}
               <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>Set</span>
                 <span>Weight (lbs)</span>
                 <span>Reps</span>
                 <span></span>
               </div>
-              {/* Sets */}
               {ex.sets.map((set, setIdx) => (
                 <div
                   key={setIdx}
@@ -183,7 +225,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                     onClick={() => toggleDone(exIdx, setIdx)}
                     className={`flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold transition-colors ${
                       set.done
-                        ? "bg-success text-success-foreground"
+                        ? "bg-green-500 text-white"
                         : "bg-secondary text-muted-foreground hover:bg-border"
                     }`}
                   >
@@ -201,7 +243,6 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
             </div>
           ))}
 
-          {/* Add exercise */}
           {showSearch ? (
             <div className="rounded-xl border border-primary bg-card shadow-sm">
               <div className="flex items-center gap-2 border-b border-border px-4 py-3">
