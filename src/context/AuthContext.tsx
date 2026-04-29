@@ -15,7 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
-  updateProfile: (updates: Partial<Pick<UserProfile, "name" | "goal" | "unit">>) => Promise<void>;
+  updateProfile: (updates: Partial<Pick<UserProfile, "name" | "goal" | "unit" | "avatarUrl">>) => Promise<void>;
   isLoading: boolean;
   supabaseConfigured: boolean;
 }
@@ -107,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
-  const updateProfile = async (updates: Partial<Pick<UserProfile, "name" | "goal" | "unit">>) => {
+  const updateProfile = async (updates: Partial<Pick<UserProfile, "name" | "goal" | "unit" | "avatarUrl">>) => {
     if (!user) return;
     await updateProfileInDb(user.id, updates);
     setUser((prev) => (prev ? { ...prev, ...updates } : prev));

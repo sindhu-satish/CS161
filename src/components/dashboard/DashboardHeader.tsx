@@ -1,8 +1,10 @@
 import { Dumbbell, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 const DashboardHeader = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <header className="flex items-center justify-between px-5 py-4">
@@ -18,9 +20,13 @@ const DashboardHeader = () => {
         type="button"
         aria-label="Open profile"
         onClick={() => navigate("/profile")}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary"
+        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-secondary"
       >
-        <User className="h-4 w-4 text-muted-foreground" />
+        {user?.avatarUrl ? (
+          <img src={user.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+        ) : (
+          <User className="h-4 w-4 text-muted-foreground" />
+        )}
       </button>
     </header>
   );

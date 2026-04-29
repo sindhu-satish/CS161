@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import StartWorkoutCard from "@/components/dashboard/StartWorkoutCard";
 import RecentWorkouts from "@/components/dashboard/RecentWorkouts";
-import ProgressChart from "@/components/dashboard/ProgressChart";
 import ActiveWorkout from "@/components/dashboard/ActiveWorkout";
 import PlanWorkout, { type WorkoutPlan } from "@/components/dashboard/PlanWorkout";
 import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
@@ -30,6 +29,7 @@ const Index = () => {
   const [plansReady, setPlansReady] = useState(false);
   const [activePlan, setActivePlan] = useState<WorkoutPlan | undefined>();
   const [openedPlan, setOpenedPlan] = useState<WorkoutPlan | undefined>();
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | undefined>();
   const [catalog, setCatalog] = useState<ExerciseInfo[]>([]);
   const [exerciseById, setExerciseById] = useState<Record<string, ExerciseInfo>>({});
   const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
@@ -99,6 +99,7 @@ const Index = () => {
       return [...prev, saved];
     });
     qc.invalidateQueries({ queryKey: ["workout-plans"] });
+    setEditingPlan(undefined);
     setView("dashboard");
   };
 
@@ -160,7 +161,11 @@ const Index = () => {
     return (
       <PlanWorkout
         onSave={handleSavePlan}
-        onCancel={() => setView("dashboard")}
+        onCancel={() => {
+          setEditingPlan(undefined);
+          setView("dashboard");
+        }}
+        initialPlan={editingPlan}
       />
     );
   }
@@ -197,8 +202,7 @@ const Index = () => {
                 <div className="min-w-0">
                   <h1 className="font-display text-lg font-bold text-foreground truncate">{openedPlan.name}</h1>
                   <p className="text-xs text-muted-foreground">
-                    {openedPlan.exercises.length} exercises ·{" "}
-                    {openedPlan.exercises.reduce((a, e) => a + e.sets.length, 0)} sets
+                    {openedPlan.exercises.length} exercises
                   </p>
                 </div>
               </div>
@@ -209,6 +213,16 @@ const Index = () => {
               >
                 <Play className="h-3 w-3" />
                 Start
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPlan(openedPlan);
+                  setView("planning");
+                }}
+                className="ml-2 flex h-9 items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground transition-colors hover:bg-border"
+              >
+                Edit
               </button>
             </div>
           </div>
@@ -227,9 +241,7 @@ const Index = () => {
                 className="w-full rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-colors hover:bg-secondary/50"
               >
                 <p className="text-sm font-semibold text-foreground">{getExerciseDisplayName(ex)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {ex.muscleGroup} · {ex.sets.length} sets
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{ex.muscleGroup}</p>
               </button>
             ))}
           </div>
@@ -270,7 +282,10 @@ const Index = () => {
             ) : plans.length === 0 ? (
               <button
                 type="button"
-                onClick={() => setView("planning")}
+                onClick={() => {
+                  setEditingPlan(undefined);
+                  setView("planning");
+                }}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 py-6 text-sm font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/10"
               >
                 <Plus className="h-5 w-5" />
@@ -290,10 +305,7 @@ const Index = () => {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-foreground truncate">{plan.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {plan.exercises.length} exercises ·{" "}
-                            {plan.exercises.reduce((a, e) => a + e.sets.length, 0)} sets
-                          </p>
+                          <p className="text-xs text-muted-foreground">{plan.exercises.length} exercises</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -310,6 +322,16 @@ const Index = () => {
                           className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:brightness-105"
                         >
                           Open Workout
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPlan(plan);
+                            setView("planning");
+                          }}
+                          className="flex h-8 items-center gap-1.5 rounded-lg bg-secondary px-3 text-xs font-semibold text-foreground transition-colors hover:bg-border"
+                        >
+                          Edit
                         </button>
                       </div>
                     </div>
@@ -339,7 +361,6 @@ const Index = () => {
           </section>
 
           <RecentWorkouts />
-          <ProgressChart queryFn={getWorkouts} />
         </div>
       </div>
       <ExerciseDetailDialog

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, X, Search, GripVertical, StickyNote } from "lucide-react";
+import { ArrowLeft, Plus, X, Search, GripVertical } from "lucide-react";
 import type { ExerciseInfo } from "@/data/types";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -33,7 +33,6 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
   const [exercises, setExercises] = useState<PlannedExercise[]>(initialPlan?.exercises || []);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
-  const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
   const [catalog, setCatalog] = useState<ExerciseInfo[]>([]);
 
   useEffect(() => {
@@ -59,6 +58,26 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
   }, []);
 
   const exerciseNames = useMemo(() => catalog.map((e) => e.name), [catalog]);
+  const catalogById = useMemo(
+    () => catalog.reduce<Record<string, ExerciseInfo>>((acc, ex) => ({ ...acc, [ex.id]: ex }), {}),
+    [catalog]
+  );
+
+  useEffect(() => {
+    if (catalog.length === 0) return;
+    setExercises((prev) =>
+      prev.map((ex) => {
+        const exerciseId = (ex as { exerciseId?: string }).exerciseId;
+        const fromCatalog = exerciseId ? catalogById[exerciseId] : undefined;
+        if (!fromCatalog) return ex;
+        return {
+          ...ex,
+          name: ex.name || fromCatalog.name,
+          muscleGroup: ex.muscleGroup || fromCatalog.muscleGroup || "Other",
+        };
+      })
+    );
+  }, [catalog, catalogById]);
 
   const filtered = exerciseNames.filter(
     (e) =>
@@ -83,47 +102,6 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
 
   const removeExercise = (idx: number) => {
     setExercises((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const addSet = (exIdx: number) => {
-    setExercises((prev) => {
-      const copy = [...prev];
-      const lastSet = copy[exIdx].sets[copy[exIdx].sets.length - 1];
-      copy[exIdx] = {
-        ...copy[exIdx],
-        sets: [
-          ...copy[exIdx].sets,
-          { targetWeight: lastSet?.targetWeight || 0, targetReps: lastSet?.targetReps || 0 },
-        ],
-      };
-      return copy;
-    });
-  };
-
-  const updateSet = (exIdx: number, setIdx: number, field: "targetWeight" | "targetReps", value: string) => {
-    setExercises((prev) => {
-      const copy = [...prev];
-      const sets = [...copy[exIdx].sets];
-      sets[setIdx] = { ...sets[setIdx], [field]: Number(value) || 0 };
-      copy[exIdx] = { ...copy[exIdx], sets };
-      return copy;
-    });
-  };
-
-  const removeSet = (exIdx: number, setIdx: number) => {
-    setExercises((prev) => {
-      const copy = [...prev];
-      copy[exIdx] = { ...copy[exIdx], sets: copy[exIdx].sets.filter((_, i) => i !== setIdx) };
-      return copy;
-    });
-  };
-
-  const updateNotes = (exIdx: number, notes: string) => {
-    setExercises((prev) => {
-      const copy = [...prev];
-      copy[exIdx] = { ...copy[exIdx], notes };
-      return copy;
-    });
   };
 
   const handleSave = () => {
@@ -178,79 +156,14 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
                 <div className="flex items-center gap-2">
                   <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
                   <div>
-                    <h4 className="text-sm font-semibold text-foreground">{ex.name}</h4>
+                    <h4 className="text-sm font-semibold text-foreground">{ex.name || "Unknown Exercise"}</h4>
                     <span className="text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setExpandedNotes(expandedNotes === exIdx ? null : exIdx)}
-                    className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                      ex.notes ? "text-accent" : "text-muted-foreground"
-                    } hover:bg-secondary`}
-                  >
-                    <StickyNote className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+                <button onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-
-              {/* Notes */}
-              {expandedNotes === exIdx && (
-                <div className="border-b border-border px-4 py-2.5">
-                  <textarea
-                    value={ex.notes}
-                    onChange={(e) => updateNotes(exIdx, e.target.value)}
-                    placeholder="Notes (e.g. slow eccentric, pause at bottom...)"
-                    rows={2}
-                    className="w-full bg-transparent text-xs text-foreground outline-none resize-none placeholder:text-muted-foreground"
-                  />
-                </div>
-              )}
-
-              {/* Sets header */}
-              <div className="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <span>Set</span>
-                <span>Weight (lbs)</span>
-                <span>Reps</span>
-                <span></span>
-              </div>
-
-              {/* Sets */}
-              {ex.sets.map((set, setIdx) => (
-                <div key={setIdx} className="grid grid-cols-[2rem_1fr_1fr_1.5rem] items-center gap-2 px-4 py-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground">{setIdx + 1}</span>
-                  <input
-                    type="number"
-                    value={set.targetWeight || ""}
-                    onChange={(e) => updateSet(exIdx, setIdx, "targetWeight", e.target.value)}
-                    placeholder="0"
-                    className="h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    type="number"
-                    value={set.targetReps || ""}
-                    onChange={(e) => updateSet(exIdx, setIdx, "targetReps", e.target.value)}
-                    placeholder="0"
-                    className="h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  {ex.sets.length > 1 && (
-                    <button onClick={() => removeSet(exIdx, setIdx)} className="text-muted-foreground hover:text-destructive">
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              <button
-                onClick={() => addSet(exIdx)}
-                className="mx-4 my-3 flex w-fit items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border"
-              >
-                <Plus className="h-3 w-3" />
-                Add Set
-              </button>
             </div>
           ))}
 
@@ -281,12 +194,7 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
                   </button>
                 ))}
                 {filtered.length === 0 && query && (
-                  <button
-                    onClick={() => addExercise(query)}
-                    className="w-full rounded-lg px-4 py-2.5 text-left text-sm text-foreground hover:bg-secondary"
-                  >
-                    Add "<span className="font-semibold">{query}</span>"
-                  </button>
+                  <p className="px-4 py-2.5 text-sm text-muted-foreground">No matching exercises in catalog.</p>
                 )}
               </div>
             </div>

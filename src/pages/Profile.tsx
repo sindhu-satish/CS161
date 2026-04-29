@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  User, Target, Ruler, Bell, Moon, ChevronRight, LogOut,
-  Edit3, Camera, Check, Timer, Volume2, Vibrate,
-  HelpCircle, Star, Share2, Trash2, Download
+  User, Target, Moon, ChevronRight, LogOut,
+  Edit3, Camera, Check, HelpCircle, Trash2
 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/context/AuthContext";
@@ -34,14 +33,8 @@ const Profile = () => {
 
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-
-  const [restTimerDuration, setRestTimerDuration] = useState(90);
-  const [restTimerSound, setRestTimerSound] = useState(true);
-  const [restTimerVibrate, setRestTimerVibrate] = useState(true);
-  const [notifWorkoutReminder, setNotifWorkoutReminder] = useState(true);
-  const [notifPRAlerts, setNotifPRAlerts] = useState(true);
-  const [notifWeeklySummary, setNotifWeeklySummary] = useState(true);
-  const [notifRestDay, setNotifRestDay] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarError, setAvatarError] = useState("");
 
   const { data: workouts = [] } = useQuery({
     queryKey: ["workouts"],
@@ -61,8 +54,34 @@ const Profile = () => {
     setActivePanel(null);
   };
 
+  const handleAvatarFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please choose an image file.");
+      return;
+    }
+    setAvatarError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result) {
+        setAvatarError("Could not load image.");
+        return;
+      }
+      void updateProfile({ avatarUrl: result });
+    };
+    reader.onerror = () => setAvatarError("Could not load image.");
+    reader.readAsDataURL(file);
+  };
+
   const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
-    <button onClick={onToggle} className="shrink-0">
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="shrink-0"
+    >
       <div className={`relative h-6 w-11 rounded-full transition-colors duration-300 ${on ? "bg-primary" : "bg-secondary"}`}>
         <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow-md transition-transform duration-300 ${on ? "translate-x-5" : "translate-x-0.5"}`} />
       </div>
@@ -82,11 +101,33 @@ const Profile = () => {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary">
-                  <User className="h-6 w-6 text-primary-foreground" />
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt="Profile"
+                      className="h-14 w-14 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-6 w-6 text-primary-foreground" />
+                  )}
                 </div>
-                <button className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border shadow-sm"
+                >
                   <Camera className="h-3 w-3 text-muted-foreground" />
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleAvatarFile(e.target.files?.[0] ?? null);
+                    e.currentTarget.value = "";
+                  }}
+                />
               </div>
               <div>
                 <h2 className="font-display text-lg font-bold text-background">{user?.name}</h2>
@@ -112,6 +153,7 @@ const Profile = () => {
             </div>
           </div>
         </div>
+        {avatarError && <p className="mx-5 mb-4 text-xs text-destructive">{avatarError}</p>}
 
         {/* Workout Settings */}
         <section className="px-5 mb-5">
@@ -132,31 +174,11 @@ const Profile = () => {
             </button>
 
             <button
-              onClick={() => setActivePanel("unit")}
+              onClick={() => void updateProfile({ unit: user?.unit === "kg" ? "lbs" : "kg" })}
               className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
             >
-              <div className="flex items-center gap-3">
-                <Ruler className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Weight Unit</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{user?.unit || "lbs"}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActivePanel("timer")}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
-            >
-              <div className="flex items-center gap-3">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Rest Timer</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{restTimerDuration}s</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
+              <span className="text-sm font-medium text-foreground">Weight Unit</span>
+              <span className="text-xs text-muted-foreground">{user?.unit || "lbs"}</span>
             </button>
           </div>
         </section>
@@ -165,22 +187,6 @@ const Profile = () => {
         <section className="px-5 mb-5">
           <h3 className="mb-3 font-display text-sm font-semibold text-foreground">App Settings</h3>
           <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden divide-y divide-border">
-            <button
-              onClick={() => setActivePanel("notifications")}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Notifications</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {[notifWorkoutReminder, notifPRAlerts, notifWeeklySummary, notifRestDay].filter(Boolean).length} active
-                </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </button>
-
             <button
               onClick={toggle}
               className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
@@ -198,27 +204,6 @@ const Profile = () => {
         <section className="px-5 mb-5">
           <h3 className="mb-3 font-display text-sm font-semibold text-foreground">Data & Support</h3>
           <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden divide-y divide-border">
-            <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30">
-              <div className="flex items-center gap-3">
-                <Download className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Export Data</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30">
-              <div className="flex items-center gap-3">
-                <Share2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Share with Friends</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <button className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30">
-              <div className="flex items-center gap-3">
-                <Star className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Rate the App</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
             <button
               onClick={() => setActivePanel("about")}
               className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-secondary/30"
@@ -330,127 +315,6 @@ const Profile = () => {
                   <p className="text-xs text-muted-foreground">{g.desc}</p>
                 </div>
               </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* WEIGHT UNIT DIALOG */}
-      <Dialog open={activePanel === "unit"} onOpenChange={(o) => !o && setActivePanel(null)}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle className="font-display text-lg font-bold text-foreground text-left">Weight Unit</DialogTitle>
-            <DialogDescription className="text-left text-xs">Choose your preferred unit of measurement</DialogDescription>
-          </DialogHeader>
-          <div className="px-5 pb-5 space-y-2">
-            {UNITS.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => {
-                  void updateProfile({ unit: u.id }).then(() => setActivePanel(null));
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
-                  user?.unit === u.id ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
-                }`}
-              >
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  user?.unit === u.id ? "bg-primary" : "bg-secondary"
-                }`}>
-                  {user?.unit === u.id ? (
-                    <Check className="h-4 w-4 text-primary-foreground" />
-                  ) : (
-                    <Ruler className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{u.label}</p>
-                  <p className="text-xs text-muted-foreground">{u.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* REST TIMER DIALOG */}
-      <Dialog open={activePanel === "timer"} onOpenChange={(o) => !o && setActivePanel(null)}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle className="font-display text-lg font-bold text-foreground text-left">Rest Timer</DialogTitle>
-            <DialogDescription className="text-left text-xs">Configure your between-sets rest timer</DialogDescription>
-          </DialogHeader>
-          <div className="px-5 pb-5 space-y-5">
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Default Duration</label>
-              <div className="mt-2 flex items-center gap-3">
-                {[30, 60, 90, 120, 180].map((dur) => (
-                  <button
-                    key={dur}
-                    onClick={() => setRestTimerDuration(dur)}
-                    className={`flex-1 rounded-lg py-2.5 text-xs font-semibold transition-colors ${
-                      restTimerDuration === dur ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-border"
-                    }`}
-                  >
-                    {dur < 60 ? `${dur}s` : `${dur / 60}m`}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-center font-display text-2xl font-bold text-foreground">
-                {Math.floor(restTimerDuration / 60)}:{(restTimerDuration % 60).toString().padStart(2, "0")}
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Volume2 className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Sound Alert</p>
-                  <p className="text-[10px] text-muted-foreground">Play sound when timer ends</p>
-                </div>
-              </div>
-              <Toggle on={restTimerSound} onToggle={() => setRestTimerSound(!restTimerSound)} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Vibrate className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Vibration</p>
-                  <p className="text-[10px] text-muted-foreground">Vibrate when timer ends</p>
-                </div>
-              </div>
-              <Toggle on={restTimerVibrate} onToggle={() => setRestTimerVibrate(!restTimerVibrate)} />
-            </div>
-            <button
-              onClick={() => setActivePanel(null)}
-              className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
-            >
-              Done
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* NOTIFICATIONS DIALOG */}
-      <Dialog open={activePanel === "notifications"} onOpenChange={(o) => !o && setActivePanel(null)}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle className="font-display text-lg font-bold text-foreground text-left">Notifications</DialogTitle>
-            <DialogDescription className="text-left text-xs">Manage your notification preferences</DialogDescription>
-          </DialogHeader>
-          <div className="px-5 pb-5 space-y-1 divide-y divide-border">
-            {[
-              { label: "Workout Reminders", desc: "Daily reminder to hit the gym", on: notifWorkoutReminder, toggle: () => setNotifWorkoutReminder(!notifWorkoutReminder) },
-              { label: "PR Alerts", desc: "Celebrate when you break a record", on: notifPRAlerts, toggle: () => setNotifPRAlerts(!notifPRAlerts) },
-              { label: "Weekly Summary", desc: "Recap of your training week", on: notifWeeklySummary, toggle: () => setNotifWeeklySummary(!notifWeeklySummary) },
-              { label: "Rest Day Reminder", desc: "Remind you to take recovery days", on: notifRestDay, toggle: () => setNotifRestDay(!notifRestDay) },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-3.5">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{item.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{item.desc}</p>
-                </div>
-                <Toggle on={item.on} onToggle={item.toggle} />
-              </div>
             ))}
           </div>
         </DialogContent>

@@ -9,6 +9,7 @@ export interface UserProfile {
   goal: string;
   unit: string;
   memberSince: string;
+  avatarUrl?: string;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,18 +47,20 @@ export async function fetchProfile(userId: string, email: string): Promise<UserP
     goal: data.goal ?? "build-muscle",
     unit: data.unit ?? "lbs",
     memberSince: data.member_since ?? "",
+    avatarUrl: data.avatar_url ?? "",
   };
 }
 
 export async function updateProfileInDb(
   userId: string,
-  updates: Partial<Pick<UserProfile, "name" | "goal" | "unit">>
+  updates: Partial<Pick<UserProfile, "name" | "goal" | "unit" | "avatarUrl">>
 ): Promise<void> {
   const supabase = getSupabase();
   const row: Record<string, string> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.goal !== undefined) row.goal = updates.goal;
   if (updates.unit !== undefined) row.unit = updates.unit;
+  if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
   if (Object.keys(row).length === 0) return;
   row.updated_at = new Date().toISOString();
   const { error } = await supabase.from("profiles").update(row).eq("id", userId);
