@@ -12,7 +12,7 @@ import {
   startOfDay,
   subDays,
 } from "date-fns";
-import { getWorkouts } from "@/lib/supabase-db";
+import { getBodyWeightLogs, getWorkouts } from "@/lib/supabase-db";
 import { fetchPREligibleExerciseNamesFromDb } from "@/lib/exercise-catalog";
 import type { Workout, WorkoutExercise } from "@/data/types";
 
@@ -133,6 +133,10 @@ const Stats = () => {
     queryKey: ["exercise-catalog-non-cardio-names"],
     queryFn: fetchPREligibleExerciseNamesFromDb,
   });
+  const { data: bodyWeightLogs = [] } = useQuery({
+    queryKey: ["body-weight-logs"],
+    queryFn: getBodyWeightLogs,
+  });
   const allowedExerciseNames = useMemo(
     () => new Set(exerciseOptions.map((name) => normalizeText(name)).filter(Boolean)),
     [exerciseOptions]
@@ -196,6 +200,15 @@ const Stats = () => {
   const selectedPRData = prSeries.length
     ? prSeries
     : [{ week: "—", value: 0 }];
+  const bodyWeightSeries = useMemo(
+    () =>
+      bodyWeightLogs.slice(-8).map((entry) => ({
+        date: format(parseISO(entry.date), "MMM d"),
+        weight: entry.weight,
+      })),
+    [bodyWeightLogs]
+  );
+  const latestWeight = bodyWeightSeries[bodyWeightSeries.length - 1]?.weight ?? null;
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -353,12 +366,57 @@ const Stats = () => {
                 <h3 className="font-display text-sm font-semibold text-foreground">Body Weight</h3>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <Scale className="h-3.5 w-3.5" />
-                  <span className="text-xs font-medium">Not tracked</span>
+                  <span className="text-xs font-medium">
+                    {latestWeight !== null ? `${latestWeight} lbs` : "Not tracked"}
+                  </span>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm text-center text-sm text-muted-foreground">
-                Body weight logging can be added in a future release. Volume and PR charts above use your saved
-                workouts.
+              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                {bodyWeightSeries.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No body weight entries yet. Add logs to see your trend.
+                  </p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={120}>
+                    <AreaChart data={bodyWeightSeries}>
+                      <defs>
+                        <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(142, 72%, 45%)" stopOpacity={0.24} />
+                          <stop offset="100%" stopColor="hsl(142, 72%, 45%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={["dataMin - 1", "dataMax + 1"]}
+                        tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={30}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          fontSize: 12,
+                          borderRadius: 8,
+                          border: "1px solid hsl(40, 18%, 88%)",
+                          background: "hsl(40, 30%, 99%)",
+                        }}
+                        formatter={(v: number) => [`${v} lbs`, "Body Weight"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="weight"
+                        stroke="hsl(142, 72%, 45%)"
+                        strokeWidth={2}
+                        fill="url(#weightGrad)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </section>
           </>
