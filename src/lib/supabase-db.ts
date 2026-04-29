@@ -131,6 +131,34 @@ export async function deleteWorkout(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateWorkoutMetadata(id: string, updates: { name: string; duration: string }): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("workouts")
+    .update({
+      name: updates.name,
+      duration: updates.duration,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateWorkoutDetails(
+  id: string,
+  updates: Pick<Workout, "name" | "duration" | "exercises">
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("workouts")
+    .update({
+      name: updates.name,
+      duration: updates.duration,
+      exercises: updates.exercises,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 // ─── Body weight logs ────────────────────────────────────────────────────────
 
 type BodyWeightRow = {
@@ -156,6 +184,25 @@ export async function getBodyWeightLogs(): Promise<BodyWeightEntry[]> {
       weight: row.weight,
     })) ?? []
   );
+}
+
+export async function saveBodyWeightLog(weight: number, loggedDate?: string): Promise<void> {
+  const supabase = getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+  const dateToUse = loggedDate ?? new Date().toISOString().slice(0, 10);
+  const { error } = await supabase.from("body_weight").upsert(
+    {
+      user_id: user.id,
+      logged_date: dateToUse,
+      weight,
+      created_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,logged_date" }
+  );
+  if (error) throw error;
 }
 
 // ─── Workout plans ───────────────────────────────────────────────────────────

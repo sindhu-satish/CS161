@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { TrendingUp, TrendingDown, Trophy, Flame, Scale, BarChart3 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar } from "recharts";
 import {
@@ -12,7 +13,7 @@ import {
   startOfDay,
   subDays,
 } from "date-fns";
-import { getBodyWeightLogs, getWorkouts } from "@/lib/supabase-db";
+import { getBodyWeightLogs, getWorkouts, saveBodyWeightLog } from "@/lib/supabase-db";
 import { fetchPREligibleExerciseNamesFromDb } from "@/lib/exercise-catalog";
 import type { Workout, WorkoutExercise } from "@/data/types";
 
@@ -125,6 +126,9 @@ function exerciseMaxByWeek(
 }
 
 const Stats = () => {
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const prSectionRef = useRef<HTMLElement | null>(null);
   const { data: workouts = [], isPending } = useQuery({
     queryKey: ["workouts"],
     queryFn: getWorkouts,
@@ -155,6 +159,13 @@ const Stats = () => {
   const [exerciseName, setExerciseName] = useState<string | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [bodyWeightInput, setBodyWeightInput] = useState("");
+  const [isSavingBodyWeight, setIsSavingBodyWeight] = useState(false);
+  const [bodyWeightError, setBodyWeightError] = useState("");
+  const requestedExerciseName = useMemo(
+    () => new URLSearchParams(location.search).get("exercise")?.trim() ?? "",
+    [location.search]
+  );
 
   useEffect(() => {
     if (loggedExerciseOptions.length === 0) {
@@ -210,6 +221,42 @@ const Stats = () => {
   );
   const latestWeight = bodyWeightSeries[bodyWeightSeries.length - 1]?.weight ?? null;
 
+  const handleSaveBodyWeight = async () => {
+    const parsedWeight = Number.parseFloat(bodyWeightInput);
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      setBodyWeightError("Enter a valid weight.");
+      return;
+    }
+    setIsSavingBodyWeight(true);
+    setBodyWeightError("");
+    try {
+      await saveBodyWeightLog(Number(parsedWeight.toFixed(1)));
+      await queryClient.invalidateQueries({ queryKey: ["body-weight-logs"] });
+      setBodyWeightInput("");
+    } catch {
+      setBodyWeightError("Could not save weight. Try again.");
+    } finally {
+      setIsSavingBodyWeight(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!requestedExerciseName) return;
+    setExerciseSearch(requestedExerciseName);
+    const normalizedRequestedName = normalizeText(requestedExerciseName);
+    const exactMatch = loggedExerciseOptions.find((name) => normalizeText(name) === normalizedRequestedName);
+    if (exactMatch) setExerciseName(exactMatch);
+    setIsSearchFocused(false);
+  }, [requestedExerciseName, loggedExerciseOptions]);
+
+  useEffect(() => {
+    if (!requestedExerciseName) return;
+    const timeoutId = window.setTimeout(() => {
+      prSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [requestedExerciseName, loggedExerciseOptions.length]);
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="mx-auto w-full max-w-4xl">
@@ -242,7 +289,7 @@ const Stats = () => {
               ))}
             </div>
 
-            <section className="px-5 mb-5">
+            <section ref={prSectionRef} className="px-5 mb-5">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-display text-sm font-semibold text-foreground">Weekly Volume</h3>
                 <div className={`flex items-center gap-1 ${volDeltaPct >= 0 ? "text-success" : "text-destructive"}`}>
@@ -378,6 +425,26 @@ const Stats = () => {
                 </div>
               </div>
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    value={bodyWeightInput}
+                    onChange={(e) => setBodyWeightInput(e.target.value)}
+                    placeholder="Today's weight (lbs)"
+                    className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveBodyWeight()}
+                    disabled={isSavingBodyWeight}
+                    className="h-9 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingBodyWeight ? "Saving..." : "Log Weight"}
+                  </button>
+                </div>
+                {bodyWeightError && <p className="mb-2 text-xs text-destructive">{bodyWeightError}</p>}
                 {bodyWeightSeries.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     No body weight entries yet. Add logs to see your trend.

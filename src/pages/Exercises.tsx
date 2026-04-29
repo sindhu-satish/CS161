@@ -5,11 +5,14 @@ import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
+const PAGE_SIZE = 5;
+
 const Exercises = () => {
   const [query, setQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("All");
   const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
   const [catalog, setCatalog] = useState<ExerciseInfo[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let mounted = true;
@@ -45,48 +48,63 @@ const Exercises = () => {
     const matchesGroup = selectedGroup === "All" || ex.muscleGroup === selectedGroup;
     return matchesQuery && matchesGroup;
   }), [catalog, query, selectedGroup]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedExercises = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, selectedGroup]);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="mx-auto w-full max-w-4xl">
-        <header className="px-5 pt-6 pb-4">
-          <h1 className="font-display text-2xl font-bold text-foreground">Exercise Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{catalog.length} exercises available</p>
-        </header>
+        <div className="sticky top-0 z-10 border-b border-border bg-background/95 pb-2 backdrop-blur-sm">
+          <header className="px-5 pt-6 pb-4">
+            <h1 className="font-display text-2xl font-bold text-foreground">Exercise Library</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{catalog.length} exercises available</p>
+          </header>
 
-        {/* Search */}
-        <div className="px-5 mb-3">
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 shadow-sm">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search exercises..."
-              className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            />
+          {/* Search */}
+          <div className="px-5 mb-3">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 shadow-sm">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search exercises..."
+                className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Muscle group filters */}
-        <div className="flex gap-2 overflow-x-auto px-5 pb-4 scrollbar-none">
-          {muscleGroups.map((group) => (
-            <button
-              key={group}
-              onClick={() => setSelectedGroup(group)}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                selectedGroup === group
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-foreground hover:bg-border"
-              }`}
-            >
-              {group}
-            </button>
-          ))}
+          {/* Muscle group filters */}
+          <div className="flex gap-2 overflow-x-auto px-5 pb-4 scrollbar-none">
+            {muscleGroups.map((group) => (
+              <button
+                key={group}
+                onClick={() => setSelectedGroup(group)}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selectedGroup === group
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-foreground hover:bg-border"
+                }`}
+              >
+                {group}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Exercise list */}
         <div className="flex flex-col gap-2.5 px-5">
-          {filtered.map((ex) => (
+          {paginatedExercises.map((ex) => (
             <button
               key={ex.name}
               onClick={() => setSelectedExercise(ex)}
@@ -114,6 +132,29 @@ const Exercises = () => {
           {filtered.length === 0 && (
             <div className="py-12 text-center">
               <p className="text-sm text-muted-foreground">No exercises found.</p>
+            </div>
+          )}
+          {filtered.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between py-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <p className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
             </div>
           )}
         </div>

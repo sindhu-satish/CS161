@@ -10,13 +10,6 @@ import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-const EXERCISE_LIST = [
-  "Bench Press", "Squat", "Deadlift", "Overhead Press", "Barbell Row",
-  "Pull Up", "Push Up", "Dumbbell Curl", "Tricep Dip", "Leg Press",
-  "Lat Pulldown", "Cable Fly", "Lunges", "Romanian Deadlift", "Calf Raise",
-  "Face Pull", "Lateral Raise", "Front Raise", "Hammer Curl", "Skull Crusher",
-];
-
 interface SetEntry {
   weight: number;
   reps: number;
@@ -64,6 +57,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
   const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [catalogNames, setCatalogNames] = useState<string[]>([]);
   const [catalogByName, setCatalogByName] = useState<Record<string, ExerciseInfo>>({});
   const [catalogById, setCatalogById] = useState<Record<string, ExerciseInfo>>({});
   const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
@@ -108,6 +102,8 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
           acc[ex.id] = ex;
           return acc;
         }, {});
+        const names = rows.map((ex) => ex.name);
+        setCatalogNames(names);
         setCatalogByName(byName);
         setCatalogById(byId);
         setExercises((prev) =>
@@ -126,6 +122,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
       })
       .catch(() => {
         if (cancelled) return;
+        setCatalogNames([]);
         setCatalogByName({});
         setCatalogById({});
       });
@@ -135,7 +132,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     };
   }, []);
 
-  const filtered = EXERCISE_LIST.filter((e) =>
+  const filtered = catalogNames.filter((e) =>
     e.toLowerCase().includes(query.toLowerCase())
   );
 
@@ -145,8 +142,8 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     setExercises((prev) => [
       ...prev,
       {
-        name,
-        muscleGroup: match?.muscleGroup || MUSCLE_GROUP_MAP[name] || "Unknown",
+        name: match?.name ?? name,
+        muscleGroup: match?.muscleGroup || "Unknown",
         sets: [{ weight: 0, reps: 0, done: false }],
         exerciseId: match?.id,
       },
@@ -355,13 +352,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                   </button>
                 ))}
                 {filtered.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => addExercise(query)}
-                    className="w-full rounded-lg px-4 py-2.5 text-left text-sm text-foreground hover:bg-secondary"
-                  >
-                    Add "<span className="font-semibold">{query}</span>" as custom exercise
-                  </button>
+                  <p className="px-4 py-2.5 text-sm text-muted-foreground">No matching exercises in catalog.</p>
                 )}
               </div>
             </div>

@@ -116,7 +116,7 @@ const ExerciseDetailDialog = ({ exercise, open, onOpenChange }: ExerciseDetailDi
             <button
               onClick={() => {
                 onOpenChange(false);
-                navigate("/stats");
+                navigate(`/stats?exercise=${encodeURIComponent(exercise.name)}`);
               }}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-3 text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
             >

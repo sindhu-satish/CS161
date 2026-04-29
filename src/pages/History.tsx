@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Dumbbell as DumbbellIcon, Trash2 } from "lucide-react";
@@ -5,9 +6,12 @@ import { getWorkouts, deleteWorkout } from "@/lib/supabase-db";
 import type { Workout } from "@/data/types";
 import { format, parseISO } from "date-fns";
 
+const PAGE_SIZE = 5;
+
 const History = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [page, setPage] = useState(1);
   const { data: workouts = [], isPending } = useQuery({
     queryKey: ["workouts"],
     queryFn: getWorkouts,
@@ -24,11 +28,20 @@ const History = () => {
     await deleteWorkout(id);
     await qc.invalidateQueries({ queryKey: ["workouts"] });
   };
+  const totalPages = Math.max(1, Math.ceil(workouts.length / PAGE_SIZE));
+  const paginatedWorkouts = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return workouts.slice(start, start + PAGE_SIZE);
+  }, [workouts, page]);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, totalPages));
+  }, [totalPages]);
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="mx-auto w-full max-w-4xl">
-        <header className="px-5 pt-6 pb-4">
+        <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-5 pt-6 pb-4 backdrop-blur-sm">
           <h1 className="font-display text-2xl font-bold text-foreground">Workout History</h1>
           <p className="mt-1 text-sm text-muted-foreground">{workouts.length} workouts logged</p>
         </header>
@@ -42,7 +55,7 @@ const History = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-3 px-5">
-            {workouts.map((w) => (
+            {paginatedWorkouts.map((w) => (
               <div
                 key={w.id}
                 className="rounded-xl border border-border bg-card shadow-sm overflow-hidden"
@@ -103,6 +116,29 @@ const History = () => {
                 </div>
               </div>
             ))}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between py-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <p className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
