@@ -71,7 +71,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     if (plan) {
       return plan.exercises.map((ex) => ({
         name: ex.name,
-        muscleGroup: MUSCLE_GROUP_MAP[ex.name] || "Other",
+        muscleGroup: ex.muscleGroup || MUSCLE_GROUP_MAP[ex.name] || "Unknown",
         sets: ex.sets.map((s) => ({ weight: s.targetWeight, reps: s.targetReps, done: false })),
         exerciseId: (ex as { exerciseId?: string }).exerciseId,
       }));
@@ -110,6 +110,19 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
         }, {});
         setCatalogByName(byName);
         setCatalogById(byId);
+        setExercises((prev) =>
+          prev.map((ex) => {
+            const fromId = ex.exerciseId ? byId[ex.exerciseId] : undefined;
+            const fromName = byName[ex.name.toLowerCase()];
+            const match = fromId || fromName;
+            if (!match) return ex;
+            return {
+              ...ex,
+              name: ex.name || match.name,
+              muscleGroup: match.muscleGroup || ex.muscleGroup || "Unknown",
+            };
+          })
+        );
       })
       .catch(() => {
         if (cancelled) return;
@@ -127,9 +140,16 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
   );
 
   const addExercise = (name: string) => {
+    const normalized = name.trim().toLowerCase();
+    const match = catalogByName[normalized];
     setExercises((prev) => [
       ...prev,
-      { name, muscleGroup: MUSCLE_GROUP_MAP[name] || "Other", sets: [{ weight: 0, reps: 0, done: false }] },
+      {
+        name,
+        muscleGroup: match?.muscleGroup || MUSCLE_GROUP_MAP[name] || "Unknown",
+        sets: [{ weight: 0, reps: 0, done: false }],
+        exerciseId: match?.id,
+      },
     ]);
     setShowSearch(false);
     setQuery("");
@@ -252,13 +272,13 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                   >
                     {ex.name}
                   </button>
-                  <span className="text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
+                  <span className="block text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
                 </div>
                 <button type="button" onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] gap-2 px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>Set</span>
                 <span>Weight (lbs)</span>
                 <span>Reps</span>
@@ -267,7 +287,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
               {ex.sets.map((set, setIdx) => (
                 <div
                   key={setIdx}
-                  className={`grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2 px-4 py-1.5 ${set.done ? "opacity-50" : ""}`}
+                  className={`grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-2 px-4 py-1.5 ${set.done ? "opacity-50" : ""}`}
                 >
                   <span className="text-xs font-semibold text-muted-foreground">{setIdx + 1}</span>
                   <input
@@ -275,14 +295,14 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                     value={set.weight || ""}
                     onChange={(e) => updateSet(exIdx, setIdx, "weight", e.target.value)}
                     placeholder="0"
-                    className="h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="min-w-0 h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                   <input
                     type="number"
                     value={set.reps || ""}
                     onChange={(e) => updateSet(exIdx, setIdx, "reps", e.target.value)}
                     placeholder="0"
-                    className="h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="min-w-0 h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                   <button
                     type="button"
