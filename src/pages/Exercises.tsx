@@ -1,25 +1,46 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { EXERCISE_CATALOG, MUSCLE_GROUPS, type ExerciseInfo } from "@/data/mockData";
+import { EXERCISE_CATALOG, type ExerciseInfo } from "@/data/mockData";
 import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
+import { fetchExerciseCatalogFromDb, MUSCLE_GROUPS } from "@/lib/exercise-catalog";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const Exercises = () => {
   const [query, setQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("All");
   const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
+  const [catalog, setCatalog] = useState<ExerciseInfo[]>(EXERCISE_CATALOG);
 
-  const filtered = EXERCISE_CATALOG.filter((ex) => {
-    const matchesQuery = ex.name.toLowerCase().includes(query.toLowerCase());
+  useEffect(() => {
+    let mounted = true;
+    if (!isSupabaseConfigured()) return;
+
+    fetchExerciseCatalogFromDb()
+      .then((rows) => {
+        if (!mounted || rows.length === 0) return;
+        setCatalog(rows);
+      })
+      .catch(() => {
+        // Keep static fallback if DB is unavailable.
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => catalog.filter((ex) => {
+    const matchesQuery = ex.name.toLowerCase().includes(query.trim().toLowerCase());
     const matchesGroup = selectedGroup === "All" || ex.muscleGroup === selectedGroup;
     return matchesQuery && matchesGroup;
-  });
+  }), [catalog, query, selectedGroup]);
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="mx-auto max-w-md">
         <header className="px-5 pt-6 pb-4">
           <h1 className="font-display text-2xl font-bold text-foreground">Exercise Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{EXERCISE_CATALOG.length} exercises available</p>
+          <p className="mt-1 text-sm text-muted-foreground">{catalog.length} exercises available</p>
         </header>
 
         {/* Search */}

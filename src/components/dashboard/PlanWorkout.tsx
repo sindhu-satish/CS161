@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, X, Search, GripVertical, StickyNote } from "lucide-react";
 import { EXERCISE_CATALOG } from "@/data/mockData";
+import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export interface PlannedSet {
   targetWeight: number;
@@ -20,8 +22,6 @@ export interface WorkoutPlan {
   exercises: PlannedExercise[];
 }
 
-const EXERCISE_NAMES = EXERCISE_CATALOG.map((e) => e.name);
-
 interface PlanWorkoutProps {
   onSave: (plan: WorkoutPlan) => void;
   onCancel: () => void;
@@ -34,20 +34,41 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
+  const [catalog, setCatalog] = useState(EXERCISE_CATALOG);
 
-  const filtered = EXERCISE_NAMES.filter(
+  useEffect(() => {
+    let mounted = true;
+    if (!isSupabaseConfigured()) return;
+
+    fetchExerciseCatalogFromDb()
+      .then((rows) => {
+        if (!mounted || rows.length === 0) return;
+        setCatalog(rows);
+      })
+      .catch(() => {
+        // Keep static fallback if DB is unavailable.
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const exerciseNames = useMemo(() => catalog.map((e) => e.name), [catalog]);
+
+  const filtered = exerciseNames.filter(
     (e) =>
       e.toLowerCase().includes(query.toLowerCase()) &&
       !exercises.some((ex) => ex.name === e)
   );
 
   const addExercise = (exerciseName: string) => {
-    const catalog = EXERCISE_CATALOG.find((e) => e.name === exerciseName);
+    const catalogEntry = catalog.find((e) => e.name === exerciseName);
     setExercises((prev) => [
       ...prev,
       {
         name: exerciseName,
-        muscleGroup: catalog?.muscleGroup || "Other",
+        muscleGroup: catalogEntry?.muscleGroup || "Other",
         sets: [{ targetWeight: 0, targetReps: 0 }],
         notes: "",
       },

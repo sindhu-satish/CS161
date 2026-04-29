@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   User, Target, Ruler, Bell, Moon, ChevronRight, LogOut,
   Edit3, Camera, Check, Timer, Volume2, Vibrate,
@@ -9,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
-import { getWorkouts } from "@/lib/storage";
+import { getWorkouts } from "@/lib/supabase-db";
 
 type SettingsPanel = null | "profile" | "goal" | "unit" | "notifications" | "timer" | "about";
 
@@ -42,7 +43,11 @@ const Profile = () => {
   const [notifWeeklySummary, setNotifWeeklySummary] = useState(true);
   const [notifRestDay, setNotifRestDay] = useState(false);
 
-  const totalWorkouts = getWorkouts().length;
+  const { data: workouts = [] } = useQuery({
+    queryKey: ["workouts"],
+    queryFn: getWorkouts,
+  });
+  const totalWorkouts = workouts.length;
   const currentGoal = GOALS.find((g) => g.id === (user?.goal || "build-muscle"))?.label || "Build Muscle";
 
   const openEditProfile = () => {
@@ -51,8 +56,8 @@ const Profile = () => {
     setActivePanel("profile");
   };
 
-  const saveProfile = () => {
-    if (editName.trim()) updateProfile({ name: editName.trim() });
+  const saveProfile = async () => {
+    if (editName.trim()) await updateProfile({ name: editName.trim() });
     setActivePanel(null);
   };
 
@@ -231,7 +236,8 @@ const Profile = () => {
         <section className="px-5 mb-5">
           <div className="flex flex-col gap-2.5">
             <button
-              onClick={logout}
+              type="button"
+              onClick={() => void logout()}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/20 py-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
             >
               <LogOut className="h-4 w-4" />
@@ -280,7 +286,8 @@ const Profile = () => {
                 Cancel
               </button>
               <button
-                onClick={saveProfile}
+                type="button"
+                onClick={() => void saveProfile()}
                 className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
               >
                 Save
@@ -301,7 +308,10 @@ const Profile = () => {
             {GOALS.map((g) => (
               <button
                 key={g.id}
-                onClick={() => { updateProfile({ goal: g.id }); setActivePanel(null); }}
+                type="button"
+                onClick={() => {
+                  void updateProfile({ goal: g.id }).then(() => setActivePanel(null));
+                }}
                 className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
                   user?.goal === g.id ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                 }`}
@@ -336,7 +346,10 @@ const Profile = () => {
             {UNITS.map((u) => (
               <button
                 key={u.id}
-                onClick={() => { updateProfile({ unit: u.id }); setActivePanel(null); }}
+                type="button"
+                onClick={() => {
+                  void updateProfile({ unit: u.id }).then(() => setActivePanel(null));
+                }}
                 className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
                   user?.unit === u.id ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-secondary/50"
                 }`}

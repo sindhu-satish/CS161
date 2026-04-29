@@ -1,15 +1,125 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, Trophy, Flame, Scale, BarChart3 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar, LineChart, Line } from "recharts";
-import { WEEKLY_VOLUME, PR_HISTORY, BODY_WEIGHT, WORKOUT_HISTORY } from "@/data/mockData";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar } from "recharts";
+import {
+  format,
+  parseISO,
+  startOfWeek,
+  endOfWeek,
+  isWithinInterval,
+  subWeeks,
+  startOfDay,
+  subDays,
+} from "date-fns";
+import { getWorkouts } from "@/lib/supabase-db";
+import { EXERCISE_CATALOG, type Workout } from "@/data/mockData";
+
+function sessionVolume(w: Workout): number {
+  return w.exercises.reduce(
+    (sum, ex) => sum + ex.sets.reduce((t, st) => t + st.weight * st.reps, 0),
+    0
+  );
+}
+
+function computeStreak(workouts: Workout[]): number {
+  if (workouts.length === 0) return 0;
+  const daySet = new Set(workouts.map((w) => w.date.slice(0, 10)));
+  let check = startOfDay(new Date());
+  if (!daySet.has(format(check, "yyyy-MM-dd"))) {
+    check = subDays(check, 1);
+    if (!daySet.has(format(check, "yyyy-MM-dd"))) return 0;
+  }
+  let streak = 0;
+  while (daySet.has(format(check, "yyyy-MM-dd"))) {
+    streak++;
+    check = subDays(check, 1);
+  }
+  return streak;
+}
+
+function countPRHits(workouts: Workout[]): number {
+  let n = 0;
+  for (const w of workouts) {
+    for (const ex of w.exercises) {
+      if (!ex.sets.length) continue;
+      const cat = EXERCISE_CATALOG.find((c) => c.name === ex.name);
+      if (!cat || cat.pr === 0) continue;
+      const mx = Math.max(...ex.sets.map((s) => s.weight));
+      if (mx >= cat.pr) n += 1;
+    }
+  }
+  return n;
+}
+
+function weeklyVolumeSeries(workouts: Workout[]): { week: string; volume: number }[] {
+  const now = new Date();
+  const out: { week: string; volume: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const ref = subWeeks(now, i);
+    const start = startOfWeek(ref, { weekStartsOn: 1 });
+    const end = endOfWeek(ref, { weekStartsOn: 1 });
+    let vol = 0;
+    for (const w of workouts) {
+      const d = parseISO(w.date);
+      if (isWithinInterval(d, { start, end })) vol += sessionVolume(w);
+    }
+    out.push({ week: format(start, "MMM d"), volume: Math.round(vol) });
+  }
+  return out;
+}
+
+function exerciseMaxByWeek(
+  workouts: Workout[],
+  exerciseName: string
+): { week: string; value: number }[] {
+  const byWeek = new Map<string, number>();
+  for (const w of workouts) {
+    const weekKey = format(startOfWeek(parseISO(w.date), { weekStartsOn: 1 }), "yyyy-MM-dd");
+    for (const ex of w.exercises) {
+      if (ex.name !== exerciseName || !ex.sets.length) continue;
+      const mx = Math.max(...ex.sets.map((s) => s.weight));
+      byWeek.set(weekKey, Math.max(byWeek.get(weekKey) ?? 0, mx));
+    }
+  }
+  const keys = [...byWeek.keys()].sort().slice(-6);
+  return keys.map((k) => ({
+    week: format(parseISO(k), "MMM d"),
+    value: byWeek.get(k) ?? 0,
+  }));
+}
+
+const PR_TRACK_EXERCISES = ["Bench Press", "Squat", "Deadlift"] as const;
 
 const Stats = () => {
-  const [prIndex, setPrIndex] = useState(0);
-  const selectedPR = PR_HISTORY[prIndex];
+  const { data: workouts = [], isPending } = useQuery({
+    queryKey: ["workouts"],
+    queryFn: getWorkouts,
+  });
 
-  const workoutsThisWeek = 3;
-  const currentStreak = 4;
-  const totalPRs = 8;
+  const [prIndex, setPrIndex] = useState(0);
+  const exerciseName = PR_TRACK_EXERCISES[prIndex];
+
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+  const workoutsThisWeek = workouts.filter((w) => {
+    const d = parseISO(w.date);
+    return isWithinInterval(d, { start: weekStart, end: weekEnd });
+  }).length;
+
+  const currentStreak = useMemo(() => computeStreak(workouts), [workouts]);
+  const totalPRs = useMemo(() => countPRHits(workouts), [workouts]);
+  const weeklyVolume = useMemo(() => weeklyVolumeSeries(workouts), [workouts]);
+  const prSeries = useMemo(() => exerciseMaxByWeek(workouts, exerciseName), [workouts, exerciseName]);
+
+  const volFirst = weeklyVolume[0]?.volume ?? 0;
+  const volLast = weeklyVolume[weeklyVolume.length - 1]?.volume ?? 0;
+  const volDeltaPct =
+    volFirst > 0 ? Math.round(((volLast - volFirst) / volFirst) * 100) : volLast > 0 ? 100 : 0;
+
+  const selectedPRData = prSeries.length
+    ? prSeries
+    : [{ week: "—", value: 0 }];
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -19,117 +129,142 @@ const Stats = () => {
           <p className="mt-1 text-sm text-muted-foreground">Your training performance at a glance</p>
         </header>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-2.5 px-5 mb-5">
-          {[
-            { icon: Flame, label: "This Week", value: workoutsThisWeek, suffix: "workouts", color: "text-accent" },
-            { icon: Trophy, label: "Streak", value: currentStreak, suffix: "days", color: "text-success" },
-            { icon: BarChart3, label: "Total PRs", value: totalPRs, suffix: "records", color: "text-accent" },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-border bg-card p-3 shadow-sm text-center">
-              <stat.icon className={`mx-auto h-4 w-4 ${stat.color} mb-1`} />
-              <p className="font-display text-xl font-bold text-foreground">{stat.value}</p>
-              <p className="text-[10px] text-muted-foreground">{stat.suffix}</p>
+        {isPending ? (
+          <p className="px-5 text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2.5 px-5 mb-5">
+              {[
+                { icon: Flame, label: "This Week", value: workoutsThisWeek, suffix: "workouts", color: "text-accent" },
+                { icon: Trophy, label: "Streak", value: currentStreak, suffix: "days", color: "text-success" },
+                { icon: BarChart3, label: "Total PRs", value: totalPRs, suffix: "hits", color: "text-accent" },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-xl border border-border bg-card p-3 shadow-sm text-center">
+                  <stat.icon className={`mx-auto h-4 w-4 ${stat.color} mb-1`} />
+                  <p className="font-display text-xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-[10px] text-muted-foreground">{stat.suffix}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Weekly Volume */}
-        <section className="px-5 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-display text-sm font-semibold text-foreground">Weekly Volume</h3>
-            <div className="flex items-center gap-1 text-success">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">+6%</span>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <ResponsiveContainer width="100%" height={140}>
-              <AreaChart data={WEEKLY_VOLUME}>
-                <defs>
-                  <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(48, 96%, 60%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(48, 96%, 60%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="week" tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(40, 18%, 88%)", background: "hsl(40, 30%, 99%)" }}
-                  formatter={(v: number) => [`${v.toLocaleString()} lbs`, "Volume"]}
-                />
-                <Area type="monotone" dataKey="volume" stroke="hsl(48, 96%, 60%)" strokeWidth={2} fill="url(#volumeGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+            <section className="px-5 mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-display text-sm font-semibold text-foreground">Weekly Volume</h3>
+                <div className={`flex items-center gap-1 ${volDeltaPct >= 0 ? "text-success" : "text-destructive"}`}>
+                  {volDeltaPct >= 0 ? (
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5" />
+                  )}
+                  <span className="text-xs font-semibold">
+                    {volDeltaPct >= 0 ? "+" : ""}
+                    {volDeltaPct}%
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                {weeklyVolume.every((w) => w.volume === 0) ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Log workouts to see weekly volume.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={140}>
+                    <AreaChart data={weeklyVolume}>
+                      <defs>
+                        <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(48, 96%, 60%)" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="hsl(48, 96%, 60%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis
+                        dataKey="week"
+                        tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        contentStyle={{
+                          fontSize: 12,
+                          borderRadius: 8,
+                          border: "1px solid hsl(40, 18%, 88%)",
+                          background: "hsl(40, 30%, 99%)",
+                        }}
+                        formatter={(v: number) => [`${v.toLocaleString()} lbs`, "Volume"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="volume"
+                        stroke="hsl(48, 96%, 60%)"
+                        strokeWidth={2}
+                        fill="url(#volumeGrad)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </section>
 
-        {/* PR Tracker */}
-        <section className="px-5 mb-5">
-          <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress</h3>
-          <div className="flex gap-2 mb-3">
-            {PR_HISTORY.map((pr, i) => (
-              <button
-                key={pr.exercise}
-                onClick={() => setPrIndex(i)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                  prIndex === i ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-border"
-                }`}
-              >
-                {pr.exercise}
-              </button>
-            ))}
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <ResponsiveContainer width="100%" height={120}>
-              <BarChart data={selectedPR.data}>
-                <XAxis dataKey="week" tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(40, 18%, 88%)", background: "hsl(40, 30%, 99%)" }}
-                  formatter={(v: number) => [`${v} lbs`, "Max"]}
-                />
-                <Bar dataKey="value" fill="hsl(48, 96%, 60%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="font-display text-2xl font-bold text-foreground">
-                {selectedPR.data[selectedPR.data.length - 1].value}
-              </span>
-              <span className="text-xs text-muted-foreground">lbs current PR</span>
-            </div>
-          </div>
-        </section>
+            <section className="px-5 mb-5">
+              <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress (logged)</h3>
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {PR_TRACK_EXERCISES.map((name, i) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setPrIndex(i)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      prIndex === i ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-border"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <ResponsiveContainer width="100%" height={120}>
+                  <BarChart data={selectedPRData}>
+                    <XAxis
+                      dataKey="week"
+                      tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{
+                        fontSize: 12,
+                        borderRadius: 8,
+                        border: "1px solid hsl(40, 18%, 88%)",
+                        background: "hsl(40, 30%, 99%)",
+                      }}
+                      formatter={(v: number) => [`${v} lbs`, "Max"]}
+                    />
+                    <Bar dataKey="value" fill="hsl(48, 96%, 60%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="font-display text-2xl font-bold text-foreground">
+                    {selectedPRData[selectedPRData.length - 1]?.value ?? 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">lbs max ({exerciseName})</span>
+                </div>
+              </div>
+            </section>
 
-        {/* Body Weight */}
-        <section className="px-5 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-display text-sm font-semibold text-foreground">Body Weight</h3>
-            <div className="flex items-center gap-1 text-success">
-              <TrendingDown className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">-4 lbs</span>
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={BODY_WEIGHT}>
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }} axisLine={false} tickLine={false} />
-                <YAxis hide domain={["dataMin - 2", "dataMax + 2"]} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(40, 18%, 88%)", background: "hsl(40, 30%, 99%)" }}
-                  formatter={(v: number) => [`${v} lbs`, "Weight"]}
-                />
-                <Line type="monotone" dataKey="weight" stroke="hsl(220, 20%, 10%)" strokeWidth={2} dot={{ fill: "hsl(48, 96%, 60%)", r: 3, strokeWidth: 0 }} />
-              </LineChart>
-            </ResponsiveContainer>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="font-display text-2xl font-bold text-foreground">
-                {BODY_WEIGHT[BODY_WEIGHT.length - 1].weight}
-              </span>
-              <span className="text-xs text-muted-foreground">lbs current</span>
-            </div>
-          </div>
-        </section>
+            <section className="px-5 mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-display text-sm font-semibold text-foreground">Body Weight</h3>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Scale className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Not tracked</span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm text-center text-sm text-muted-foreground">
+                Body weight logging can be added in a future release. Volume and PR charts above use your saved
+                workouts.
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </div>
   );

@@ -3,33 +3,45 @@ import { Dumbbell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
-  const { login, register } = useAuth();
+  const { login, register, supabaseConfigured } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError("");
     if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
-    if (isRegistering) {
-      if (!name.trim()) { setError("Please enter your name."); return; }
-      const success = register(name.trim(), email.trim(), password);
-      if (!success) setError("An account with that email already exists.");
-    } else {
-      const success = login(email.trim(), password);
-      if (!success) setError("Invalid email or password.");
+    if (!supabaseConfigured) {
+      setError("Supabase is not configured. Copy .env.example to .env.local and add your project URL and anon key.");
+      return;
+    }
+    setPending(true);
+    try {
+      if (isRegistering) {
+        if (!name.trim()) {
+          setError("Please enter your name.");
+          return;
+        }
+        const res = await register(name.trim(), email.trim(), password);
+        if (!res.ok) setError(res.error ?? "Registration failed.");
+      } else {
+        const res = await login(email.trim(), password);
+        if (!res.ok) setError(res.error ?? "Sign in failed.");
+      }
+    } finally {
+      setPending(false);
     }
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-5">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
             <Dumbbell className="h-8 w-8 text-primary-foreground" />
@@ -42,7 +54,6 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Form */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
           {isRegistering && (
             <div>
@@ -91,18 +102,23 @@ const Login = () => {
           )}
 
           <button
+            type="button"
+            disabled={pending}
             onClick={handleSubmit}
-            className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
+            className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105 disabled:opacity-60"
           >
-            {isRegistering ? "Create Account" : "Sign In"}
+            {pending ? "Please wait…" : isRegistering ? "Create Account" : "Sign In"}
           </button>
         </div>
 
-        {/* Toggle */}
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {isRegistering ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
-            onClick={() => { setIsRegistering(!isRegistering); setError(""); }}
+            type="button"
+            onClick={() => {
+              setIsRegistering(!isRegistering);
+              setError("");
+            }}
             className="font-semibold text-primary"
           >
             {isRegistering ? "Sign In" : "Register"}

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Search, Plus, X, Pause, Play, Square } from "lucide-react";
 import type { WorkoutPlan } from "./PlanWorkout";
-import { saveWorkout } from "@/lib/storage";
+import { saveWorkout } from "@/lib/supabase-db";
 import type { Workout } from "@/data/mockData";
 
 const EXERCISE_LIST = [
@@ -52,6 +54,7 @@ interface ActiveWorkoutProps {
 }
 
 const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
+  const qc = useQueryClient();
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
@@ -126,28 +129,34 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
     setExercises((prev) => prev.filter((_, i) => i !== exIdx));
   };
 
-  const handleFinish = () => {
-    if (exercises.length > 0) {
-      const workout: Workout = {
-        id: `w${Date.now()}`,
-        date: new Date().toISOString().split("T")[0],
-        name: plan?.name || "Quick Workout",
-        duration: formatDuration(elapsed),
-        exercises: exercises.map((ex) => ({
-          name: ex.name,
-          muscleGroup: ex.muscleGroup,
-          sets: ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, done: s.done })),
-        })),
-      };
-      saveWorkout(workout);
+  const handleFinish = async () => {
+    if (exercises.length === 0) {
+      onFinish();
+      return;
     }
-    onFinish();
+    const workout: Workout = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().split("T")[0],
+      name: plan?.name || "Quick Workout",
+      duration: formatDuration(elapsed),
+      exercises: exercises.map((ex) => ({
+        name: ex.name,
+        muscleGroup: ex.muscleGroup,
+        sets: ex.sets.map((s) => ({ weight: s.weight, reps: s.reps, done: s.done })),
+      })),
+    };
+    try {
+      await saveWorkout(workout);
+      await qc.invalidateQueries({ queryKey: ["workouts"] });
+      onFinish();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save workout");
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-md">
-        {/* Timer header */}
         <div className="sticky top-0 z-10 bg-foreground px-5 pb-4 pt-5">
           <div className="flex items-center justify-between">
             <div>
@@ -158,6 +167,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
             </div>
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setPaused(!paused)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-background/10 transition-colors hover:bg-background/20"
               >
@@ -168,7 +178,8 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                 )}
               </button>
               <button
-                onClick={handleFinish}
+                type="button"
+                onClick={() => void handleFinish()}
                 className="flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 font-display text-sm font-semibold text-primary-foreground transition-colors hover:brightness-105"
               >
                 <Square className="h-3.5 w-3.5" />
@@ -182,7 +193,6 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
           </div>
         </div>
 
-        {/* Exercise list */}
         <div className="flex flex-col gap-4 px-5 py-5">
           {exercises.map((ex, exIdx) => (
             <div key={exIdx} className="rounded-xl border border-border bg-card shadow-sm">
@@ -191,7 +201,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                   <h4 className="text-sm font-semibold text-foreground">{ex.name}</h4>
                   <span className="text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
                 </div>
-                <button onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
+                <button type="button" onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -222,6 +232,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                     className="h-9 rounded-lg border border-border bg-secondary px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                   <button
+                    type="button"
                     onClick={() => toggleDone(exIdx, setIdx)}
                     className={`flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold transition-colors ${
                       set.done
@@ -234,6 +245,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                 </div>
               ))}
               <button
+                type="button"
                 onClick={() => addSet(exIdx)}
                 className="mx-4 my-3 flex w-fit items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border"
               >
@@ -254,7 +266,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                   placeholder="Search exercises..."
                   className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 />
-                <button onClick={() => { setShowSearch(false); setQuery(""); }} className="text-muted-foreground">
+                <button type="button" onClick={() => { setShowSearch(false); setQuery(""); }} className="text-muted-foreground">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -262,6 +274,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                 {filtered.map((name) => (
                   <button
                     key={name}
+                    type="button"
                     onClick={() => addExercise(name)}
                     className="w-full rounded-lg px-4 py-2.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary"
                   >
@@ -270,6 +283,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
                 ))}
                 {filtered.length === 0 && (
                   <button
+                    type="button"
                     onClick={() => addExercise(query)}
                     className="w-full rounded-lg px-4 py-2.5 text-left text-sm text-foreground hover:bg-secondary"
                   >
@@ -280,6 +294,7 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => setShowSearch(true)}
               className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-4 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
             >

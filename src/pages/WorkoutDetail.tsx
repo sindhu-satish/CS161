@@ -1,59 +1,73 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Clock, Dumbbell, Trophy, Weight, Zap } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
-import { WORKOUT_HISTORY, EXERCISE_CATALOG } from "@/data/mockData";
+import { EXERCISE_CATALOG } from "@/data/mockData";
 import { format, parseISO } from "date-fns";
+import { getWorkoutById } from "@/lib/supabase-db";
 
 const WorkoutDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const workout = WORKOUT_HISTORY.find((w) => w.id === id);
 
-  if (!workout) {
+  const { data: workout, isPending, isError } = useQuery({
+    queryKey: ["workout", id],
+    queryFn: () => getWorkoutById(id!),
+    enabled: Boolean(id),
+  });
+
+  if (isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Workout not found.</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     );
   }
 
-  // Calculate total volume
+  if (isError || !workout) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-5">
+        <p className="text-muted-foreground">Workout not found.</p>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="rounded-xl bg-secondary px-4 py-2 text-sm font-medium"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
   const totalVolume = workout.exercises.reduce(
     (sum, ex) => sum + ex.sets.reduce((s, set) => s + set.weight * set.reps, 0),
     0
   );
 
-  // Calculate total sets
-  const totalSets = workout.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
-
-  // Calculate PRs — check if any set's weight matches or exceeds the catalog PR
   const prs = workout.exercises.filter((ex) => {
+    if (!ex.sets.length) return false;
     const catalogEntry = EXERCISE_CATALOG.find((c) => c.name === ex.name);
     if (!catalogEntry || catalogEntry.pr === 0) return false;
     const maxWeight = Math.max(...ex.sets.map((s) => s.weight));
     return maxWeight >= catalogEntry.pr;
   });
 
-  // Top weight lifted
-  const topWeight = Math.max(
-    ...workout.exercises.flatMap((ex) => ex.sets.map((s) => s.weight))
-  );
+  const allWeights = workout.exercises.flatMap((ex) => ex.sets.map((s) => s.weight));
+  const topWeight = allWeights.length === 0 ? 0 : Math.max(...allWeights);
 
-  // Muscle group volume split for radar chart
   const muscleGroupMap: Record<string, number> = {};
   workout.exercises.forEach((ex) => {
     const vol = ex.sets.reduce((s, set) => s + set.weight * set.reps, 0);
     muscleGroupMap[ex.muscleGroup] = (muscleGroupMap[ex.muscleGroup] || 0) + vol;
   });
 
-  const maxGroupVol = Math.max(...Object.values(muscleGroupMap));
+  const maxGroupVol = Math.max(...Object.values(muscleGroupMap), 1);
   const radarData = Object.entries(muscleGroupMap).map(([group, vol]) => ({
     muscle: group,
     volume: Math.round((vol / maxGroupVol) * 100),
     rawVolume: vol,
   }));
 
-  // Pad radar to at least 3 points for a proper shape
   const allGroups = ["Chest", "Back", "Shoulders", "Arms", "Legs", "Core"];
   const fullRadarData = allGroups.map((group) => {
     const existing = radarData.find((d) => d.muscle === group);
@@ -63,9 +77,9 @@ const WorkoutDetail = () => {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="mx-auto max-w-md">
-        {/* Header */}
         <header className="sticky top-0 z-40 flex items-center gap-3 bg-background/95 backdrop-blur-sm px-5 pt-5 pb-4">
           <button
+            type="button"
             onClick={() => navigate(-1)}
             className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary transition-colors hover:bg-border"
           >
@@ -79,7 +93,6 @@ const WorkoutDetail = () => {
           </div>
         </header>
 
-        {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-2.5 px-5 mb-5">
           <div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
@@ -93,7 +106,10 @@ const WorkoutDetail = () => {
               <Weight className="h-3.5 w-3.5 text-accent" />
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Volume</span>
             </div>
-            <p className="font-display text-xl font-bold text-foreground">{totalVolume.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-1">lbs</span></p>
+            <p className="font-display text-xl font-bold text-foreground">
+              {totalVolume.toLocaleString()}
+              <span className="text-xs font-normal text-muted-foreground ml-1">lbs</span>
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
@@ -107,11 +123,13 @@ const WorkoutDetail = () => {
               <Zap className="h-3.5 w-3.5 text-accent" />
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Top Weight</span>
             </div>
-            <p className="font-display text-xl font-bold text-foreground">{topWeight}<span className="text-xs font-normal text-muted-foreground ml-1">lbs</span></p>
+            <p className="font-display text-xl font-bold text-foreground">
+              {topWeight}
+              <span className="text-xs font-normal text-muted-foreground ml-1">lbs</span>
+            </p>
           </div>
         </div>
 
-        {/* Muscle Split Radar */}
         <section className="px-5 mb-5">
           <h3 className="font-display text-sm font-semibold text-foreground mb-2">Muscle Split</h3>
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -135,7 +153,6 @@ const WorkoutDetail = () => {
           </div>
         </section>
 
-        {/* Exercise Breakdown */}
         <section className="px-5">
           <h3 className="font-display text-sm font-semibold text-foreground mb-2">
             Exercises <span className="text-muted-foreground font-normal">({workout.exercises.length})</span>
@@ -159,10 +176,11 @@ const WorkoutDetail = () => {
                         </span>
                       )}
                     </div>
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {ex.muscleGroup}
+                    </span>
                   </div>
 
-                  {/* Sets table */}
                   <div className="ml-6 space-y-0.5">
                     {ex.sets.map((set, j) => (
                       <div key={j} className="flex items-center gap-4 text-xs">
