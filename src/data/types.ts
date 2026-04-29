@@ -20,6 +20,11 @@ export interface Workout {
   exercises: WorkoutExercise[];
 }
 
+export interface BodyWeightEntry {
+  date: string;
+  weight: number;
+}
+
 export interface ExerciseInfo {
   id: string;
   name: string;

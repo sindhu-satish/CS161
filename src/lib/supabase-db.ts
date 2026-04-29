@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { Workout } from "@/data/types";
+import type { BodyWeightEntry, Workout } from "@/data/types";
 import type { WorkoutPlan } from "@/components/dashboard/PlanWorkout";
 
 export interface UserProfile {
@@ -129,6 +129,33 @@ export async function deleteWorkout(id: string): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase.from("workouts").delete().eq("id", id);
   if (error) throw error;
+}
+
+// ─── Body weight logs ────────────────────────────────────────────────────────
+
+type BodyWeightRow = {
+  logged_date: string;
+  weight: number;
+};
+
+export async function getBodyWeightLogs(): Promise<BodyWeightEntry[]> {
+  const supabase = getSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("body_weight")
+    .select("logged_date, weight")
+    .eq("user_id", user.id)
+    .order("logged_date", { ascending: true });
+  if (error) throw error;
+  return (
+    (data as BodyWeightRow[] | null)?.map((row) => ({
+      date: row.logged_date,
+      weight: row.weight,
+    })) ?? []
+  );
 }
 
 // ─── Workout plans ───────────────────────────────────────────────────────────
