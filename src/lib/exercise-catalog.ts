@@ -50,3 +50,23 @@ export async function fetchExerciseCatalogFromDb(): Promise<ExerciseInfo[]> {
       : row.gif_url || undefined,
   }));
 }
+
+export async function fetchPREligibleExerciseNamesFromDb(): Promise<string[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("exercises_catalog_rapid")
+    .select("name, body_part, equipment")
+    .neq("body_part", "cardio")
+    .neq("equipment", "body weight")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+
+  const names = ((data as Array<{ name: string | null; body_part: string | null; equipment: string | null }> | null) ?? [])
+    .filter((row) => (row.body_part ?? "").trim().toLowerCase() !== "cardio")
+    .filter((row) => (row.equipment ?? "").trim().toLowerCase() !== "body weight")
+    .map((row) => (row.name ?? "").trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(names));
+}

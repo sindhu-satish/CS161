@@ -13,7 +13,12 @@ import {
   subDays,
 } from "date-fns";
 import { getWorkouts } from "@/lib/supabase-db";
+import { fetchPREligibleExerciseNamesFromDb } from "@/lib/exercise-catalog";
 import type { Workout, WorkoutExercise } from "@/data/types";
+
+function normalizeText(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
 
 function isCardioExercise(exercise: WorkoutExercise): boolean {
   return (exercise.muscleGroup ?? "").trim().toLowerCase() === "cardio";
@@ -23,7 +28,10 @@ function hasWeightedSets(exercise: WorkoutExercise): boolean {
   return exercise.sets.some((set) => set.weight > 0);
 }
 
-function isPREligibleExercise(exercise: WorkoutExercise): boolean {
+function isPREligibleExercise(exercise: WorkoutExercise, allowedExerciseNames: Set<string>): boolean {
+  const normalizedName = normalizeText(exercise.name);
+  if (!normalizedName) return false;
+  if (!allowedExerciseNames.has(normalizedName)) return false;
   return !isCardioExercise(exercise) && hasWeightedSets(exercise);
 }
 
@@ -50,14 +58,14 @@ function computeStreak(workouts: Workout[]): number {
   return streak;
 }
 
-function countPRHits(workouts: Workout[]): number {
+function countPRHits(workouts: Workout[], allowedExerciseNames: Set<string>): number {
   const sorted = [...workouts].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
   const seenMax = new Map<string, number>();
   let hits = 0;
 
   for (const w of sorted) {
     for (const ex of w.exercises) {
-      if (!isPREligibleExercise(ex)) continue;
+      if (!isPREligibleExercise(ex, allowedExerciseNames)) continue;
       const currentMax = Math.max(...ex.sets.map((s) => s.weight));
       const previousMax = seenMax.get(ex.name);
       if (previousMax !== undefined && currentMax > previousMax) {
@@ -88,13 +96,16 @@ function weeklyVolumeSeries(workouts: Workout[]): { week: string; volume: number
 
 function exerciseMaxByWeek(
   workouts: Workout[],
-  exerciseName: string
+  exerciseName: string,
+  allowedExerciseNames: Set<string>
 ): { week: string; value: number }[] {
+  const normalizedExerciseName = normalizeText(exerciseName);
+  if (!normalizedExerciseName) return [];
   const byWeek = new Map<string, number>();
   for (const w of workouts) {
     const weekKey = format(startOfWeek(parseISO(w.date), { weekStartsOn: 1 }), "yyyy-MM-dd");
     for (const ex of w.exercises) {
-      if (!isPREligibleExercise(ex) || ex.name !== exerciseName) continue;
+      if (!isPREligibleExercise(ex, allowedExerciseNames) || normalizeText(ex.name) !== normalizedExerciseName) continue;
       const mx = Math.max(...ex.sets.map((s) => s.weight));
       byWeek.set(weekKey, Math.max(byWeek.get(weekKey) ?? 0, mx));
     }
@@ -111,38 +122,34 @@ const Stats = () => {
     queryKey: ["workouts"],
     queryFn: getWorkouts,
   });
-
-  const exerciseOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          workouts.flatMap((w) =>
-            w.exercises.filter((ex) => isPREligibleExercise(ex)).map((ex) => ex.name).filter(Boolean)
-          )
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [workouts]
+  const { data: exerciseOptions = [] } = useQuery({
+    queryKey: ["exercise-catalog-non-cardio-names"],
+    queryFn: fetchPREligibleExerciseNamesFromDb,
+  });
+  const allowedExerciseNames = useMemo(
+    () => new Set(exerciseOptions.map((name) => normalizeText(name)).filter(Boolean)),
+    [exerciseOptions]
   );
   const [exerciseName, setExerciseName] = useState<string | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   useEffect(() => {
     if (exerciseOptions.length === 0) {
       setExerciseName(null);
-      setExerciseSearch("");
       return;
     }
-    if (!exerciseName || !exerciseOptions.includes(exerciseName)) {
-      setExerciseName(exerciseOptions[0]);
-      setExerciseSearch(exerciseOptions[0]);
+    if (exerciseName && !exerciseOptions.includes(exerciseName)) {
+      setExerciseName(null);
     }
   }, [exerciseOptions, exerciseName]);
 
   const normalizedSearch = exerciseSearch.trim().toLowerCase();
-  const selectedExercise = useMemo(() => {
-    if (normalizedSearch) return exerciseSearch.trim();
-    return exerciseName;
-  }, [exerciseName, exerciseSearch, normalizedSearch]);
+  const filteredExerciseOptions = useMemo(() => {
+    if (!normalizedSearch) return exerciseOptions;
+    return exerciseOptions.filter((name) => name.toLowerCase().includes(normalizedSearch));
+  }, [exerciseOptions, normalizedSearch]);
+  const selectedExercise = exerciseName;
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -152,11 +159,11 @@ const Stats = () => {
   }).length;
 
   const currentStreak = useMemo(() => computeStreak(workouts), [workouts]);
-  const totalPRs = useMemo(() => countPRHits(workouts), [workouts]);
+  const totalPRs = useMemo(() => countPRHits(workouts, allowedExerciseNames), [workouts, allowedExerciseNames]);
   const weeklyVolume = useMemo(() => weeklyVolumeSeries(workouts), [workouts]);
   const prSeries = useMemo(
-    () => (selectedExercise ? exerciseMaxByWeek(workouts, selectedExercise) : []),
-    [workouts, selectedExercise]
+    () => (selectedExercise ? exerciseMaxByWeek(workouts, selectedExercise, allowedExerciseNames) : []),
+    [workouts, selectedExercise, allowedExerciseNames]
   );
 
   const volFirst = weeklyVolume[0]?.volume ?? 0;
@@ -252,25 +259,37 @@ const Stats = () => {
 
             <section className="px-5 mb-5">
               <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress (logged)</h3>
-              <div className="mb-3">
+              <div className="mb-3 relative">
                 <input
                   type="text"
-                  list="pr-exercise-options"
                   value={exerciseSearch}
                   onChange={(e) => {
-                    const next = e.target.value;
-                    setExerciseSearch(next);
-                    const exact = exerciseOptions.find((name) => name.toLowerCase() === next.trim().toLowerCase());
-                    if (exact) setExerciseName(exact);
+                    setExerciseSearch(e.target.value);
                   }}
-                  placeholder="Search exercise for PR progress"
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  placeholder="Type exercise name"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
-                <datalist id="pr-exercise-options">
-                  {exerciseOptions.map((name) => (
-                    <option key={name} value={name} />
-                  ))}
-                </datalist>
+                {isSearchFocused && filteredExerciseOptions.length > 0 && (
+                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-md">
+                    {filteredExerciseOptions.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setExerciseSearch(name);
+                          setExerciseName(name);
+                          setIsSearchFocused(false);
+                        }}
+                        className="block w-full rounded-md px-2.5 py-2 text-left text-sm text-foreground hover:bg-secondary"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                 <ResponsiveContainer width="100%" height={120}>
