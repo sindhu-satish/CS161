@@ -2,9 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Clock, Dumbbell, Trophy, Weight, Zap } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
-import { EXERCISE_CATALOG } from "@/data/mockData";
 import { format, parseISO } from "date-fns";
-import { getWorkoutById } from "@/lib/supabase-db";
+import { getWorkoutById, getWorkouts } from "@/lib/supabase-db";
 
 const WorkoutDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +13,10 @@ const WorkoutDetail = () => {
     queryKey: ["workout", id],
     queryFn: () => getWorkoutById(id!),
     enabled: Boolean(id),
+  });
+  const { data: allWorkouts = [] } = useQuery({
+    queryKey: ["workouts"],
+    queryFn: getWorkouts,
   });
 
   if (isPending) {
@@ -44,12 +47,24 @@ const WorkoutDetail = () => {
     0
   );
 
+  const priorMaxByExercise = new Map<string, number>();
+  const workoutDateMs = parseISO(workout.date).getTime();
+  const sorted = [...allWorkouts].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  for (const prev of sorted) {
+    if (prev.id === workout.id) continue;
+    if (parseISO(prev.date).getTime() >= workoutDateMs) continue;
+    for (const ex of prev.exercises) {
+      if (!ex.sets.length) continue;
+      const mx = Math.max(...ex.sets.map((s) => s.weight));
+      priorMaxByExercise.set(ex.name, Math.max(priorMaxByExercise.get(ex.name) ?? 0, mx));
+    }
+  }
+
   const prs = workout.exercises.filter((ex) => {
     if (!ex.sets.length) return false;
-    const catalogEntry = EXERCISE_CATALOG.find((c) => c.name === ex.name);
-    if (!catalogEntry || catalogEntry.pr === 0) return false;
     const maxWeight = Math.max(...ex.sets.map((s) => s.weight));
-    return maxWeight >= catalogEntry.pr;
+    const priorMax = priorMaxByExercise.get(ex.name);
+    return priorMax !== undefined && maxWeight > priorMax;
   });
 
   const allWeights = workout.exercises.flatMap((ex) => ex.sets.map((s) => s.weight));
@@ -161,8 +176,8 @@ const WorkoutDetail = () => {
             {workout.exercises.map((ex, i) => {
               const exVolume = ex.sets.reduce((s, set) => s + set.weight * set.reps, 0);
               const maxWeight = Math.max(...ex.sets.map((s) => s.weight));
-              const catalogEntry = EXERCISE_CATALOG.find((c) => c.name === ex.name);
-              const isPR = catalogEntry && catalogEntry.pr > 0 && maxWeight >= catalogEntry.pr;
+              const priorMax = priorMaxByExercise.get(ex.name);
+              const isPR = priorMax !== undefined && maxWeight > priorMax;
 
               return (
                 <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm">

@@ -13,7 +13,7 @@ import {
   subDays,
 } from "date-fns";
 import { getWorkouts } from "@/lib/supabase-db";
-import { EXERCISE_CATALOG, type Workout } from "@/data/mockData";
+import type { Workout } from "@/data/mockData";
 
 function sessionVolume(w: Workout): number {
   return w.exercises.reduce(
@@ -39,17 +39,22 @@ function computeStreak(workouts: Workout[]): number {
 }
 
 function countPRHits(workouts: Workout[]): number {
-  let n = 0;
-  for (const w of workouts) {
+  const sorted = [...workouts].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  const seenMax = new Map<string, number>();
+  let hits = 0;
+
+  for (const w of sorted) {
     for (const ex of w.exercises) {
       if (!ex.sets.length) continue;
-      const cat = EXERCISE_CATALOG.find((c) => c.name === ex.name);
-      if (!cat || cat.pr === 0) continue;
-      const mx = Math.max(...ex.sets.map((s) => s.weight));
-      if (mx >= cat.pr) n += 1;
+      const currentMax = Math.max(...ex.sets.map((s) => s.weight));
+      const previousMax = seenMax.get(ex.name);
+      if (previousMax !== undefined && currentMax > previousMax) {
+        hits += 1;
+      }
+      seenMax.set(ex.name, Math.max(previousMax ?? 0, currentMax));
     }
   }
-  return n;
+  return hits;
 }
 
 function weeklyVolumeSeries(workouts: Workout[]): { week: string; volume: number }[] {

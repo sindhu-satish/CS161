@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { EXERCISE_CATALOG, type ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/mockData";
 import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -9,19 +9,23 @@ const Exercises = () => {
   const [query, setQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("All");
   const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
-  const [catalog, setCatalog] = useState<ExerciseInfo[]>(EXERCISE_CATALOG);
+  const [catalog, setCatalog] = useState<ExerciseInfo[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) {
+      setCatalog([]);
+      return;
+    }
 
     fetchExerciseCatalogFromDb()
       .then((rows) => {
-        if (!mounted || rows.length === 0) return;
+        if (!mounted) return;
         setCatalog(rows);
       })
       .catch(() => {
-        // Keep static fallback if DB is unavailable.
+        if (!mounted) return;
+        setCatalog([]);
       });
 
     return () => {

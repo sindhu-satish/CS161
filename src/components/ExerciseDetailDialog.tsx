@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { WORKOUT_HISTORY, type ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/mockData";
 
 interface ExerciseDetailDialogProps {
   exercise: ExerciseInfo | null;
@@ -27,14 +27,6 @@ const ExerciseDetailDialog = ({ exercise, open, onOpenChange }: ExerciseDetailDi
     instructions: (exercise.instructions ?? []).filter(Boolean),
   };
   const showImage = Boolean(exercise.imageUrl);
-
-  // Gather history stats for this exercise
-  const allSets = WORKOUT_HISTORY.flatMap((w) =>
-    w.exercises.filter((e) => e.name === exercise.name).flatMap((e) => e.sets)
-  );
-  const totalSets = allSets.length;
-  const maxWeight = allSets.length > 0 ? Math.max(...allSets.map((s) => s.weight)) : 0;
-  const totalVolume = allSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -71,24 +63,6 @@ const ExerciseDetailDialog = ({ exercise, open, onOpenChange }: ExerciseDetailDi
             </DialogDescription>
           </DialogHeader>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{exercise.description}</p>
-
-          {/* Quick stats */}
-          {totalSets > 0 && (
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-secondary p-2.5 text-center">
-                <p className="font-display text-base font-bold text-foreground">{maxWeight}</p>
-                <p className="text-[9px] text-muted-foreground">Max (lbs)</p>
-              </div>
-              <div className="rounded-lg bg-secondary p-2.5 text-center">
-                <p className="font-display text-base font-bold text-foreground">{totalSets}</p>
-                <p className="text-[9px] text-muted-foreground">Total Sets</p>
-              </div>
-              <div className="rounded-lg bg-secondary p-2.5 text-center">
-                <p className="font-display text-base font-bold text-foreground">{(totalVolume / 1000).toFixed(1)}k</p>
-                <p className="text-[9px] text-muted-foreground">Volume (lbs)</p>
-              </div>
-            </div>
-          )}
 
           {/* Muscles Targeted */}
           <div className="mt-5">

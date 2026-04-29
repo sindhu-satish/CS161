@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, X, Search, GripVertical, StickyNote } from "lucide-react";
-import { EXERCISE_CATALOG } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/mockData";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -34,19 +34,23 @@ const PlanWorkout = ({ onSave, onCancel, initialPlan }: PlanWorkoutProps) => {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedNotes, setExpandedNotes] = useState<number | null>(null);
-  const [catalog, setCatalog] = useState(EXERCISE_CATALOG);
+  const [catalog, setCatalog] = useState<ExerciseInfo[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) {
+      setCatalog([]);
+      return;
+    }
 
     fetchExerciseCatalogFromDb()
       .then((rows) => {
-        if (!mounted || rows.length === 0) return;
+        if (!mounted) return;
         setCatalog(rows);
       })
       .catch(() => {
-        // Keep static fallback if DB is unavailable.
+        if (!mounted) return;
+        setCatalog([]);
       });
 
     return () => {
