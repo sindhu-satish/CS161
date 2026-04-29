@@ -26,6 +26,10 @@ export interface ExerciseInfo {
   equipment: string;
   description: string;
   pr: number;
+  imageUrl?: string;
+  instructions?: string[];
+  secondaryMuscles?: string[];
+  target?: string;
 }
 
 export const MUSCLE_GROUPS = [

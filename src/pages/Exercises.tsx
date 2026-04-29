@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { EXERCISE_CATALOG, type ExerciseInfo } from "@/data/mockData";
 import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
-import { fetchExerciseCatalogFromDb, MUSCLE_GROUPS } from "@/lib/exercise-catalog";
+import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 const Exercises = () => {
@@ -28,6 +28,13 @@ const Exercises = () => {
       mounted = false;
     };
   }, []);
+
+  const muscleGroups = useMemo(() => {
+    const groups = Array.from(new Set(catalog.map((ex) => ex.muscleGroup).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    return ["All", ...groups];
+  }, [catalog]);
 
   const filtered = useMemo(() => catalog.filter((ex) => {
     const matchesQuery = ex.name.toLowerCase().includes(query.trim().toLowerCase());
@@ -58,7 +65,7 @@ const Exercises = () => {
 
         {/* Muscle group filters */}
         <div className="flex gap-2 overflow-x-auto px-5 pb-4 scrollbar-none">
-          {MUSCLE_GROUPS.map((group) => (
+          {muscleGroups.map((group) => (
             <button
               key={group}
               onClick={() => setSelectedGroup(group)}
