@@ -5,6 +5,10 @@ import { Search, Plus, X, Pause, Play, Square } from "lucide-react";
 import type { WorkoutPlan } from "./PlanWorkout";
 import { saveWorkout } from "@/lib/supabase-db";
 import type { Workout } from "@/data/types";
+import type { ExerciseInfo } from "@/data/types";
+import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
+import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const EXERCISE_LIST = [
   "Bench Press", "Squat", "Deadlift", "Overhead Press", "Barbell Row",
@@ -23,6 +27,7 @@ interface LoggedExercise {
   name: string;
   muscleGroup: string;
   sets: SetEntry[];
+  exerciseId?: string;
 }
 
 const MUSCLE_GROUP_MAP: Record<string, string> = {
@@ -59,12 +64,16 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
   const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [catalogByName, setCatalogByName] = useState<Record<string, ExerciseInfo>>({});
+  const [catalogById, setCatalogById] = useState<Record<string, ExerciseInfo>>({});
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
   const [exercises, setExercises] = useState<LoggedExercise[]>(() => {
     if (plan) {
       return plan.exercises.map((ex) => ({
         name: ex.name,
         muscleGroup: MUSCLE_GROUP_MAP[ex.name] || "Other",
         sets: ex.sets.map((s) => ({ weight: s.targetWeight, reps: s.targetReps, done: false })),
+        exerciseId: (ex as { exerciseId?: string }).exerciseId,
       }));
     }
     return [];
@@ -79,6 +88,39 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [paused]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isSupabaseConfigured()) {
+      setCatalogByName({});
+      setCatalogById({});
+      return;
+    }
+
+    fetchExerciseCatalogFromDb()
+      .then((rows) => {
+        if (cancelled) return;
+        const byName = rows.reduce<Record<string, ExerciseInfo>>((acc, ex) => {
+          acc[ex.name.toLowerCase()] = ex;
+          return acc;
+        }, {});
+        const byId = rows.reduce<Record<string, ExerciseInfo>>((acc, ex) => {
+          acc[ex.id] = ex;
+          return acc;
+        }, {});
+        setCatalogByName(byName);
+        setCatalogById(byId);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCatalogByName({});
+        setCatalogById({});
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = EXERCISE_LIST.filter((e) =>
     e.toLowerCase().includes(query.toLowerCase())
@@ -198,7 +240,18 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
             <div key={exIdx} className="rounded-xl border border-border bg-card shadow-sm">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
-                  <h4 className="text-sm font-semibold text-foreground">{ex.name}</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const byId = ex.exerciseId ? catalogById[ex.exerciseId] : undefined;
+                      const byName = catalogByName[ex.name.toLowerCase()];
+                      const found = byId || byName;
+                      if (found) setSelectedExercise(found);
+                    }}
+                    className="text-left text-sm font-semibold text-foreground hover:text-accent transition-colors"
+                  >
+                    {ex.name}
+                  </button>
                   <span className="text-[10px] text-muted-foreground">{ex.muscleGroup}</span>
                 </div>
                 <button type="button" onClick={() => removeExercise(exIdx)} className="text-muted-foreground hover:text-destructive">
@@ -304,6 +357,13 @@ const ActiveWorkout = ({ onFinish, plan }: ActiveWorkoutProps) => {
           )}
         </div>
       </div>
+      <ExerciseDetailDialog
+        exercise={selectedExercise}
+        open={!!selectedExercise}
+        onOpenChange={(open) => {
+          if (!open) setSelectedExercise(null);
+        }}
+      />
     </div>
   );
 };
