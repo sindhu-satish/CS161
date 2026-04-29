@@ -224,9 +224,15 @@ const Stats = () => {
           <>
             <div className="grid grid-cols-3 gap-2.5 px-5 mb-5">
               {[
-                { icon: Flame, label: "This Week", value: workoutsThisWeek, suffix: "workouts", color: "text-accent" },
-                { icon: Trophy, label: "Streak", value: currentStreak, suffix: "days", color: "text-success" },
-                { icon: BarChart3, label: "Total PRs", value: totalPRs, suffix: "hits", color: "text-accent" },
+                {
+                  icon: Flame,
+                  label: "Workouts This Week",
+                  value: workoutsThisWeek,
+                  suffix: "workouts this week",
+                  color: "text-accent",
+                },
+                { icon: Trophy, label: "Streak", value: currentStreak, suffix: "days streak", color: "text-success" },
+                { icon: BarChart3, label: "Lifetime PRs", value: totalPRs, suffix: "lifetime PRs", color: "text-accent" },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-xl border border-border bg-card p-3 shadow-sm text-center">
                   <stat.icon className={`mx-auto h-4 w-4 ${stat.color} mb-1`} />
