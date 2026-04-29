@@ -255,28 +255,32 @@ const Stats = () => {
 
             <section className="px-5 mb-5">
               <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress (logged)</h3>
-              {exerciseOptions.length > 0 ? (
-                <div className="mb-3">
-                  <input
-                    type="text"
-                    list="pr-exercise-options"
-                    value={exerciseSearch}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setExerciseSearch(next);
-                      const exact = exerciseOptions.find((name) => name.toLowerCase() === next.trim().toLowerCase());
-                      if (exact) setExerciseName(exact);
-                    }}
-                    placeholder="Search exercise for PR progress"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                  <datalist id="pr-exercise-options">
-                    {exerciseOptions.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
-                </div>
-              ) : (
+              <div className="mb-3">
+                <input
+                  type="text"
+                  list="pr-exercise-options"
+                  value={exerciseSearch}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setExerciseSearch(next);
+                    const exact = exerciseOptions.find((name) => name.toLowerCase() === next.trim().toLowerCase());
+                    if (exact) setExerciseName(exact);
+                  }}
+                  placeholder={
+                    exerciseOptions.length > 0
+                      ? "Search exercise for PR progress"
+                      : "No non-cardio weighted exercises logged yet"
+                  }
+                  disabled={exerciseOptions.length === 0}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <datalist id="pr-exercise-options">
+                  {exerciseOptions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </div>
+              {exerciseOptions.length === 0 && (
                 <p className="mb-3 text-xs text-muted-foreground">Log workouts with sets to see PR progress by exercise.</p>
               )}
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
