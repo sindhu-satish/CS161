@@ -25,6 +25,7 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || "exercisedb.p.rapidapi.com";
 
 const MAX_PER_GROUP = 30;
+const API_OFFSET = 30;
 const FORCE_REFRESH = process.argv.includes("--force");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !RAPIDAPI_KEY) {
@@ -68,7 +69,7 @@ async function fetchEquipmentList() {
 async function fetchExercisesByBodyPart(bodyPart, limit = MAX_PER_GROUP) {
   const encoded = encodeURIComponent(bodyPart);
   return fetchJson(
-    `${BASE_URL}/exercises/bodyPart/${encoded}?sortOrder=ascending&limit=${limit}&offset=0`
+    `${BASE_URL}/exercises/bodyPart/${encoded}?sortOrder=ascending&limit=${limit}&offset=${API_OFFSET}`
   );
 }
 
@@ -138,11 +139,21 @@ async function seedBodyPart(bodyPart) {
   const apiRows = await fetchExercisesByBodyPart(bodyPart, MAX_PER_GROUP);
 
   const merged = new Map();
+  const seenExternalIds = new Set();
   for (const item of apiRows) {
     const row = toExerciseRow(item);
-    const key = row.name.toLowerCase();
-    if (!row.name || (!FORCE_REFRESH && existingNames.has(key)) || merged.has(key)) continue;
-    merged.set(key, row);
+    const nameKey = row.name.toLowerCase();
+    const externalIdKey = normalizeText(row.external_id).toLowerCase();
+    if (
+      !row.name ||
+      (!FORCE_REFRESH && existingNames.has(nameKey)) ||
+      merged.has(nameKey) ||
+      (externalIdKey && seenExternalIds.has(externalIdKey))
+    ) {
+      continue;
+    }
+    if (externalIdKey) seenExternalIds.add(externalIdKey);
+    merged.set(nameKey, row);
     if (merged.size >= needed) break;
   }
 

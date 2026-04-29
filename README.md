@@ -13,6 +13,7 @@ Workout logging app (Vite + React + TypeScript) backed by **Supabase** for authe
 
    - `supabase/migrations/001_fittrack_schema.sql`
    - `supabase/migrations/002_exercises_catalog.sql`
+   - `supabase/migrations/003_exercises_rapid.sql`
 
    That creates `profiles`, `workouts`, `workout_plans`, row-level security policies, and a trigger to create a profile row when a user signs up.
 
@@ -34,6 +35,8 @@ Set:
 - `VITE_SUPABASE_ANON_KEY` — **Publishable** key (`sb_publishable_...`) or legacy **anon** JWT from the API settings
 - `SUPABASE_SERVICE_ROLE_KEY` — used only for exercise import script (never expose in client code)
 - `API_NINJAS_KEY` — API key from API Ninjas Exercise API
+- `RAPIDAPI_KEY` — RapidAPI key for ExerciseDB
+- `RAPIDAPI_HOST` — default `exercisedb.p.rapidapi.com`
 
 `.env.local` is gitignored.
 
@@ -63,6 +66,29 @@ To re-import deliberately:
 npm run seed:exercises:force
 ```
 
+## Seed exercise catalog (RapidAPI ExerciseDB -> Supabase)
+
+Imports into tables suffixed with `_rapid`:
+
+- `body_parts_rapid`
+- `equipment_rapid`
+- `exercises_catalog_rapid`
+
+Command:
+
+```sh
+npm run seed:exercises:rapid
+```
+
+This imports up to **30 exercises per body part group**.
+If a body part already has 30 rows, it skips API calls for that group.
+
+Force refresh:
+
+```sh
+npm run seed:exercises:rapid:force
+```
+
 ## Scripts
 
 | Command        | Description           |
@@ -73,3 +99,5 @@ npm run seed:exercises:force
 | `npm run lint` | ESLint                |
 | `npm run seed:exercises` | Import exercise catalog |
 | `npm run seed:exercises:force` | Re-import exercise catalog |
+| `npm run seed:exercises:rapid` | Import RapidAPI ExerciseDB |
+| `npm run seed:exercises:rapid:force` | Force refresh RapidAPI data |
