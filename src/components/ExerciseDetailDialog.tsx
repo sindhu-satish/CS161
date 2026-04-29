@@ -18,6 +18,7 @@ interface ExerciseDetailDialogProps {
 const ExerciseDetailDialog = ({ exercise, open, onOpenChange }: ExerciseDetailDialogProps) => {
   const navigate = useNavigate();
   if (!exercise) return null;
+  const isCardioExercise = (exercise.muscleGroup ?? "").trim().toLowerCase() === "cardio";
 
   const details = {
     muscles: [
@@ -111,17 +112,19 @@ const ExerciseDetailDialog = ({ exercise, open, onOpenChange }: ExerciseDetailDi
           )}
 
           {/* View Stats button */}
-          <button
-            onClick={() => {
-              onOpenChange(false);
-              navigate("/stats");
-            }}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-3 text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
-          >
-            <BarChart3 className="h-4 w-4" />
-            View My Stats
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {!isCardioExercise && (
+            <button
+              onClick={() => {
+                onOpenChange(false);
+                navigate("/stats");
+              }}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-3 text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
+            >
+              <BarChart3 className="h-4 w-4" />
+              View My Stats
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
