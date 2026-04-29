@@ -130,25 +130,36 @@ const Stats = () => {
     () => new Set(exerciseOptions.map((name) => normalizeText(name)).filter(Boolean)),
     [exerciseOptions]
   );
+  const loggedExerciseOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const workout of workouts) {
+      for (const exercise of workout.exercises) {
+        if (!isPREligibleExercise(exercise, allowedExerciseNames)) continue;
+        const trimmedName = exercise.name?.trim();
+        if (trimmedName) names.add(trimmedName);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [workouts, allowedExerciseNames]);
   const [exerciseName, setExerciseName] = useState<string | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   useEffect(() => {
-    if (exerciseOptions.length === 0) {
+    if (loggedExerciseOptions.length === 0) {
       setExerciseName(null);
       return;
     }
-    if (exerciseName && !exerciseOptions.includes(exerciseName)) {
+    if (exerciseName && !loggedExerciseOptions.includes(exerciseName)) {
       setExerciseName(null);
     }
-  }, [exerciseOptions, exerciseName]);
+  }, [loggedExerciseOptions, exerciseName]);
 
   const normalizedSearch = exerciseSearch.trim().toLowerCase();
   const filteredExerciseOptions = useMemo(() => {
-    if (!normalizedSearch) return exerciseOptions;
-    return exerciseOptions.filter((name) => name.toLowerCase().includes(normalizedSearch));
-  }, [exerciseOptions, normalizedSearch]);
+    if (!normalizedSearch) return loggedExerciseOptions;
+    return loggedExerciseOptions.filter((name) => name.toLowerCase().includes(normalizedSearch));
+  }, [loggedExerciseOptions, normalizedSearch]);
   const selectedExercise = exerciseName;
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
