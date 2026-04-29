@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, Trophy, Flame, Scale, BarChart3 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar } from "recharts";
@@ -94,16 +94,30 @@ function exerciseMaxByWeek(
   }));
 }
 
-const PR_TRACK_EXERCISES = ["Bench Press", "Squat", "Deadlift"] as const;
-
 const Stats = () => {
   const { data: workouts = [], isPending } = useQuery({
     queryKey: ["workouts"],
     queryFn: getWorkouts,
   });
 
-  const [prIndex, setPrIndex] = useState(0);
-  const exerciseName = PR_TRACK_EXERCISES[prIndex];
+  const exerciseOptions = useMemo(
+    () =>
+      Array.from(new Set(workouts.flatMap((w) => w.exercises.map((ex) => ex.name)).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [workouts]
+  );
+  const [exerciseName, setExerciseName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (exerciseOptions.length === 0) {
+      setExerciseName(null);
+      return;
+    }
+    if (!exerciseName || !exerciseOptions.includes(exerciseName)) {
+      setExerciseName(exerciseOptions[0]);
+    }
+  }, [exerciseOptions, exerciseName]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -115,7 +129,10 @@ const Stats = () => {
   const currentStreak = useMemo(() => computeStreak(workouts), [workouts]);
   const totalPRs = useMemo(() => countPRHits(workouts), [workouts]);
   const weeklyVolume = useMemo(() => weeklyVolumeSeries(workouts), [workouts]);
-  const prSeries = useMemo(() => exerciseMaxByWeek(workouts, exerciseName), [workouts, exerciseName]);
+  const prSeries = useMemo(
+    () => (exerciseName ? exerciseMaxByWeek(workouts, exerciseName) : []),
+    [workouts, exerciseName]
+  );
 
   const volFirst = weeklyVolume[0]?.volume ?? 0;
   const volLast = weeklyVolume[weeklyVolume.length - 1]?.volume ?? 0;
@@ -210,20 +227,26 @@ const Stats = () => {
 
             <section className="px-5 mb-5">
               <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress (logged)</h3>
-              <div className="flex gap-2 mb-3 flex-wrap">
-                {PR_TRACK_EXERCISES.map((name, i) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => setPrIndex(i)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                      prIndex === i ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground hover:bg-border"
-                    }`}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
+              {exerciseOptions.length > 0 ? (
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {exerciseOptions.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setExerciseName(name)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        exerciseName === name
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-border"
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-3 text-xs text-muted-foreground">Log workouts with sets to see PR progress by exercise.</p>
+              )}
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                 <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={selectedPRData}>
@@ -250,7 +273,7 @@ const Stats = () => {
                   <span className="font-display text-2xl font-bold text-foreground">
                     {selectedPRData[selectedPRData.length - 1]?.value ?? 0}
                   </span>
-                  <span className="text-xs text-muted-foreground">lbs max ({exerciseName})</span>
+                  <span className="text-xs text-muted-foreground">lbs max ({exerciseName ?? "No exercise"})</span>
                 </div>
               </div>
             </section>
