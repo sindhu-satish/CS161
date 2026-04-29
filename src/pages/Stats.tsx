@@ -94,6 +94,13 @@ function weeklyVolumeSeries(workouts: Workout[]): { week: string; volume: number
   return out;
 }
 
+function formatWeeklyXAxisLabel(index: number, totalPoints: number): string {
+  const weeksAgo = totalPoints - index - 1;
+  if (weeksAgo <= 0) return "This wk";
+  if (weeksAgo === 1) return "Last wk";
+  return `${weeksAgo}w ago`;
+}
+
 function exerciseMaxByWeek(
   workouts: Workout[],
   exerciseName: string,
@@ -177,10 +184,14 @@ const Stats = () => {
     [workouts, selectedExercise, allowedExerciseNames]
   );
 
-  const volFirst = weeklyVolume[0]?.volume ?? 0;
-  const volLast = weeklyVolume[weeklyVolume.length - 1]?.volume ?? 0;
+  const lastWeekVolume = weeklyVolume[weeklyVolume.length - 2]?.volume ?? 0;
+  const thisWeekVolume = weeklyVolume[weeklyVolume.length - 1]?.volume ?? 0;
   const volDeltaPct =
-    volFirst > 0 ? Math.round(((volLast - volFirst) / volFirst) * 100) : volLast > 0 ? 100 : 0;
+    lastWeekVolume > 0
+      ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100)
+      : thisWeekVolume > 0
+        ? 100
+        : 0;
 
   const selectedPRData = prSeries.length
     ? prSeries
@@ -241,6 +252,9 @@ const Stats = () => {
                       </defs>
                       <XAxis
                         dataKey="week"
+                        tickFormatter={(_value: string, index: number) =>
+                          formatWeeklyXAxisLabel(index, weeklyVolume.length)
+                        }
                         tick={{ fontSize: 10, fill: "hsl(220, 10%, 46%)" }}
                         axisLine={false}
                         tickLine={false}
@@ -253,6 +267,7 @@ const Stats = () => {
                           border: "1px solid hsl(40, 18%, 88%)",
                           background: "hsl(40, 30%, 99%)",
                         }}
+                        labelFormatter={(label: string) => `Week of ${label}`}
                         formatter={(v: number) => [`${v.toLocaleString()} lbs`, "Volume"]}
                       />
                       <Area
