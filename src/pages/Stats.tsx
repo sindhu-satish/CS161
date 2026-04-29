@@ -13,7 +13,15 @@ import {
   subDays,
 } from "date-fns";
 import { getWorkouts } from "@/lib/supabase-db";
-import type { Workout } from "@/data/types";
+import type { Workout, WorkoutExercise } from "@/data/types";
+
+const CARDIO_KEYWORDS = ["cardio", "run", "running", "bike", "cycling", "treadmill", "elliptical", "row"];
+
+function isCardioExercise(exercise: WorkoutExercise): boolean {
+  const group = exercise.muscleGroup?.toLowerCase() ?? "";
+  const name = exercise.name?.toLowerCase() ?? "";
+  return CARDIO_KEYWORDS.some((keyword) => group.includes(keyword) || name.includes(keyword));
+}
 
 function sessionVolume(w: Workout): number {
   return w.exercises.reduce(
@@ -45,7 +53,7 @@ function countPRHits(workouts: Workout[]): number {
 
   for (const w of sorted) {
     for (const ex of w.exercises) {
-      if (!ex.sets.length) continue;
+      if (isCardioExercise(ex) || !ex.sets.length) continue;
       const currentMax = Math.max(...ex.sets.map((s) => s.weight));
       const previousMax = seenMax.get(ex.name);
       if (previousMax !== undefined && currentMax > previousMax) {
@@ -82,7 +90,7 @@ function exerciseMaxByWeek(
   for (const w of workouts) {
     const weekKey = format(startOfWeek(parseISO(w.date), { weekStartsOn: 1 }), "yyyy-MM-dd");
     for (const ex of w.exercises) {
-      if (ex.name !== exerciseName || !ex.sets.length) continue;
+      if (isCardioExercise(ex) || ex.name !== exerciseName || !ex.sets.length) continue;
       const mx = Math.max(...ex.sets.map((s) => s.weight));
       byWeek.set(weekKey, Math.max(byWeek.get(weekKey) ?? 0, mx));
     }
@@ -102,22 +110,38 @@ const Stats = () => {
 
   const exerciseOptions = useMemo(
     () =>
-      Array.from(new Set(workouts.flatMap((w) => w.exercises.map((ex) => ex.name)).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      ),
+      Array.from(
+        new Set(
+          workouts.flatMap((w) =>
+            w.exercises.filter((ex) => !isCardioExercise(ex) && ex.sets.length > 0).map((ex) => ex.name).filter(Boolean)
+          )
+        )
+      ).sort((a, b) => a.localeCompare(b)),
     [workouts]
   );
   const [exerciseName, setExerciseName] = useState<string | null>(null);
+  const [exerciseSearch, setExerciseSearch] = useState("");
 
   useEffect(() => {
     if (exerciseOptions.length === 0) {
       setExerciseName(null);
+      setExerciseSearch("");
       return;
     }
     if (!exerciseName || !exerciseOptions.includes(exerciseName)) {
       setExerciseName(exerciseOptions[0]);
+      setExerciseSearch(exerciseOptions[0]);
     }
   }, [exerciseOptions, exerciseName]);
+
+  const normalizedSearch = exerciseSearch.trim().toLowerCase();
+  const selectedExercise = useMemo(() => {
+    if (!exerciseName) return null;
+    if (!normalizedSearch) return exerciseName;
+    const exact = exerciseOptions.find((name) => name.toLowerCase() === normalizedSearch);
+    if (exact) return exact;
+    return exerciseOptions.find((name) => name.toLowerCase().includes(normalizedSearch)) ?? null;
+  }, [exerciseName, exerciseOptions, normalizedSearch]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -130,8 +154,8 @@ const Stats = () => {
   const totalPRs = useMemo(() => countPRHits(workouts), [workouts]);
   const weeklyVolume = useMemo(() => weeklyVolumeSeries(workouts), [workouts]);
   const prSeries = useMemo(
-    () => (exerciseName ? exerciseMaxByWeek(workouts, exerciseName) : []),
-    [workouts, exerciseName]
+    () => (selectedExercise ? exerciseMaxByWeek(workouts, selectedExercise) : []),
+    [workouts, selectedExercise]
   );
 
   const volFirst = weeklyVolume[0]?.volume ?? 0;
@@ -228,21 +252,25 @@ const Stats = () => {
             <section className="px-5 mb-5">
               <h3 className="font-display text-sm font-semibold text-foreground mb-2">PR Progress (logged)</h3>
               {exerciseOptions.length > 0 ? (
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  {exerciseOptions.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setExerciseName(name)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                        exerciseName === name
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-foreground hover:bg-border"
-                      }`}
-                    >
-                      {name}
-                    </button>
-                  ))}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    list="pr-exercise-options"
+                    value={exerciseSearch}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setExerciseSearch(next);
+                      const exact = exerciseOptions.find((name) => name.toLowerCase() === next.trim().toLowerCase());
+                      if (exact) setExerciseName(exact);
+                    }}
+                    placeholder="Search exercise for PR progress"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <datalist id="pr-exercise-options">
+                    {exerciseOptions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
               ) : (
                 <p className="mb-3 text-xs text-muted-foreground">Log workouts with sets to see PR progress by exercise.</p>
@@ -273,7 +301,7 @@ const Stats = () => {
                   <span className="font-display text-2xl font-bold text-foreground">
                     {selectedPRData[selectedPRData.length - 1]?.value ?? 0}
                   </span>
-                  <span className="text-xs text-muted-foreground">lbs max ({exerciseName ?? "No exercise"})</span>
+                  <span className="text-xs text-muted-foreground">lbs max ({selectedExercise ?? "No exercise"})</span>
                 </div>
               </div>
             </section>
