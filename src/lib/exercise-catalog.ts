@@ -4,6 +4,7 @@ import type { ExerciseInfo } from "@/data/types";
 const RAPID_IMAGE_BUCKET = "exercise-images-rapid";
 
 type ExerciseCatalogRow = {
+  id: string;
   name: string;
   body_part: string;
   equipment: string | null;
@@ -28,13 +29,14 @@ export async function fetchExerciseCatalogFromDb(): Promise<ExerciseInfo[]> {
   } = supabase.storage.from(RAPID_IMAGE_BUCKET).getPublicUrl("");
   const { data, error } = await supabase
     .from("exercises_catalog_rapid")
-    .select("name, body_part, target, equipment, secondary_muscles, instructions, description, image_path, gif_url")
+    .select("id, name, body_part, target, equipment, secondary_muscles, instructions, description, image_path, gif_url")
     .order("body_part", { ascending: true })
     .order("name", { ascending: true });
 
   if (error) throw error;
 
   return ((data as ExerciseCatalogRow[] | null) ?? []).map((row) => ({
+    id: row.id,
     name: row.name,
     muscleGroup: toTitleCase(row.body_part || "Unknown"),
     equipment: row.equipment || "Unknown",

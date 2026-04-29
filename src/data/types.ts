@@ -21,6 +21,7 @@ export interface Workout {
 }
 
 export interface ExerciseInfo {
+  id: string;
   name: string;
   muscleGroup: string;
   equipment: string;
