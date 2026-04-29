@@ -140,12 +140,9 @@ const Stats = () => {
 
   const normalizedSearch = exerciseSearch.trim().toLowerCase();
   const selectedExercise = useMemo(() => {
-    if (!exerciseName) return null;
-    if (!normalizedSearch) return exerciseName;
-    const exact = exerciseOptions.find((name) => name.toLowerCase() === normalizedSearch);
-    if (exact) return exact;
-    return exerciseOptions.find((name) => name.toLowerCase().includes(normalizedSearch)) ?? null;
-  }, [exerciseName, exerciseOptions, normalizedSearch]);
+    if (normalizedSearch) return exerciseSearch.trim();
+    return exerciseName;
+  }, [exerciseName, exerciseSearch, normalizedSearch]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -266,13 +263,8 @@ const Stats = () => {
                     const exact = exerciseOptions.find((name) => name.toLowerCase() === next.trim().toLowerCase());
                     if (exact) setExerciseName(exact);
                   }}
-                  placeholder={
-                    exerciseOptions.length > 0
-                      ? "Search exercise for PR progress"
-                      : "No non-cardio weighted exercises logged yet"
-                  }
-                  disabled={exerciseOptions.length === 0}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Search exercise for PR progress"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <datalist id="pr-exercise-options">
                   {exerciseOptions.map((name) => (
@@ -280,9 +272,6 @@ const Stats = () => {
                   ))}
                 </datalist>
               </div>
-              {exerciseOptions.length === 0 && (
-                <p className="mb-3 text-xs text-muted-foreground">Log workouts with sets to see PR progress by exercise.</p>
-              )}
               <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                 <ResponsiveContainer width="100%" height={120}>
                   <BarChart data={selectedPRData}>
