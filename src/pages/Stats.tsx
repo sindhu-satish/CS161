@@ -15,12 +15,16 @@ import {
 import { getWorkouts } from "@/lib/supabase-db";
 import type { Workout, WorkoutExercise } from "@/data/types";
 
-const CARDIO_KEYWORDS = ["cardio", "run", "running", "bike", "cycling", "treadmill", "elliptical", "row"];
-
 function isCardioExercise(exercise: WorkoutExercise): boolean {
-  const group = exercise.muscleGroup?.toLowerCase() ?? "";
-  const name = exercise.name?.toLowerCase() ?? "";
-  return CARDIO_KEYWORDS.some((keyword) => group.includes(keyword) || name.includes(keyword));
+  return (exercise.muscleGroup ?? "").trim().toLowerCase() === "cardio";
+}
+
+function hasWeightedSets(exercise: WorkoutExercise): boolean {
+  return exercise.sets.some((set) => set.weight > 0);
+}
+
+function isPREligibleExercise(exercise: WorkoutExercise): boolean {
+  return !isCardioExercise(exercise) && hasWeightedSets(exercise);
 }
 
 function sessionVolume(w: Workout): number {
@@ -53,7 +57,7 @@ function countPRHits(workouts: Workout[]): number {
 
   for (const w of sorted) {
     for (const ex of w.exercises) {
-      if (isCardioExercise(ex) || !ex.sets.length) continue;
+      if (!isPREligibleExercise(ex)) continue;
       const currentMax = Math.max(...ex.sets.map((s) => s.weight));
       const previousMax = seenMax.get(ex.name);
       if (previousMax !== undefined && currentMax > previousMax) {
@@ -90,7 +94,7 @@ function exerciseMaxByWeek(
   for (const w of workouts) {
     const weekKey = format(startOfWeek(parseISO(w.date), { weekStartsOn: 1 }), "yyyy-MM-dd");
     for (const ex of w.exercises) {
-      if (isCardioExercise(ex) || ex.name !== exerciseName || !ex.sets.length) continue;
+      if (!isPREligibleExercise(ex) || ex.name !== exerciseName) continue;
       const mx = Math.max(...ex.sets.map((s) => s.weight));
       byWeek.set(weekKey, Math.max(byWeek.get(weekKey) ?? 0, mx));
     }
@@ -113,7 +117,7 @@ const Stats = () => {
       Array.from(
         new Set(
           workouts.flatMap((w) =>
-            w.exercises.filter((ex) => !isCardioExercise(ex) && ex.sets.length > 0).map((ex) => ex.name).filter(Boolean)
+            w.exercises.filter((ex) => isPREligibleExercise(ex)).map((ex) => ex.name).filter(Boolean)
           )
         )
       ).sort((a, b) => a.localeCompare(b)),
