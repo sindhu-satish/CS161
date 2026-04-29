@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Search, Plus, X, Pause, Play, Square } from "lucide-react";
 import type { WorkoutPlan } from "./PlanWorkout";
 import { saveWorkout } from "@/lib/supabase-db";
-import type { Workout } from "@/data/mockData";
+import type { Workout } from "@/data/types";
 
 const EXERCISE_LIST = [
   "Bench Press", "Squat", "Deadlift", "Overhead Press", "Barbell Row",

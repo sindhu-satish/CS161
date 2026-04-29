@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/types";
 import ExerciseDetailDialog from "@/components/ExerciseDetailDialog";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";

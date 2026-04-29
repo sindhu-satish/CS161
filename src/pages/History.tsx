@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Dumbbell as DumbbellIcon, Trash2 } from "lucide-react";
 import { getWorkouts, deleteWorkout } from "@/lib/supabase-db";
-import type { Workout } from "@/data/mockData";
+import type { Workout } from "@/data/types";
 import { format, parseISO } from "date-fns";
 
 const History = () => {

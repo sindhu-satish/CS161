@@ -13,7 +13,7 @@ import {
   subDays,
 } from "date-fns";
 import { getWorkouts } from "@/lib/supabase-db";
-import type { Workout } from "@/data/mockData";
+import type { Workout } from "@/data/types";
 
 function sessionVolume(w: Workout): number {
   return w.exercises.reduce(

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TrendingUp } from "lucide-react";
 import { format, parseISO, startOfWeek } from "date-fns";
 import { getWorkouts } from "@/lib/supabase-db";
-import type { Workout } from "@/data/mockData";
+import type { Workout } from "@/data/types";
 
 interface ProgressChartProps {
   /** Defaults to {@link getWorkouts}; override only for tests. */

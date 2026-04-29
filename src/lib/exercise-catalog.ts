@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/types";
 
 const RAPID_IMAGE_BUCKET = "exercise-images-rapid";
 

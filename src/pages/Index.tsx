@@ -13,106 +13,9 @@ import {
   fetchWorkoutPlans,
   upsertWorkoutPlan,
   deleteWorkoutPlan,
-  insertWorkoutPlans,
   getWorkouts,
 } from "@/lib/supabase-db";
 import { isSupabaseConfigured } from "@/lib/supabase";
-
-const DEFAULT_PLANS: Omit<WorkoutPlan, "id">[] = [
-  {
-    name: "Push Day",
-    exercises: [
-      {
-        name: "Bench Press",
-        muscleGroup: "Chest",
-        sets: [
-          { targetWeight: 185, targetReps: 8 },
-          { targetWeight: 195, targetReps: 6 },
-          { targetWeight: 205, targetReps: 4 },
-        ],
-        notes: "Warm up with bar first",
-      },
-      {
-        name: "Overhead Press",
-        muscleGroup: "Shoulders",
-        sets: [
-          { targetWeight: 115, targetReps: 8 },
-          { targetWeight: 125, targetReps: 6 },
-        ],
-        notes: "",
-      },
-      {
-        name: "Cable Fly",
-        muscleGroup: "Chest",
-        sets: [
-          { targetWeight: 40, targetReps: 12 },
-          { targetWeight: 45, targetReps: 10 },
-        ],
-        notes: "Squeeze at peak",
-      },
-      {
-        name: "Lateral Raise",
-        muscleGroup: "Shoulders",
-        sets: [
-          { targetWeight: 25, targetReps: 15 },
-          { targetWeight: 25, targetReps: 12 },
-        ],
-        notes: "",
-      },
-      {
-        name: "Skull Crusher",
-        muscleGroup: "Arms",
-        sets: [
-          { targetWeight: 75, targetReps: 10 },
-          { targetWeight: 85, targetReps: 8 },
-        ],
-        notes: "",
-      },
-    ],
-  },
-  {
-    name: "Leg Day",
-    exercises: [
-      {
-        name: "Squat",
-        muscleGroup: "Legs",
-        sets: [
-          { targetWeight: 225, targetReps: 8 },
-          { targetWeight: 245, targetReps: 6 },
-          { targetWeight: 265, targetReps: 4 },
-        ],
-        notes: "Deep squats, control descent",
-      },
-      {
-        name: "Romanian Deadlift",
-        muscleGroup: "Legs",
-        sets: [
-          { targetWeight: 205, targetReps: 10 },
-          { targetWeight: 225, targetReps: 8 },
-        ],
-        notes: "",
-      },
-      {
-        name: "Leg Press",
-        muscleGroup: "Legs",
-        sets: [
-          { targetWeight: 400, targetReps: 12 },
-          { targetWeight: 450, targetReps: 10 },
-        ],
-        notes: "",
-      },
-      {
-        name: "Calf Raise",
-        muscleGroup: "Legs",
-        sets: [
-          { targetWeight: 170, targetReps: 15 },
-          { targetWeight: 190, targetReps: 12 },
-        ],
-        notes: "Slow eccentric",
-      },
-    ],
-  },
-];
 
 type ViewMode = "dashboard" | "planning" | "active";
 
@@ -133,11 +36,7 @@ const Index = () => {
     let cancelled = false;
     (async () => {
       try {
-        let list = await fetchWorkoutPlans();
-        if (!cancelled && list.length === 0) {
-          await insertWorkoutPlans(DEFAULT_PLANS);
-          list = await fetchWorkoutPlans();
-        }
+        const list = await fetchWorkoutPlans();
         if (!cancelled) {
           setPlans(list);
           qc.invalidateQueries({ queryKey: ["workout-plans"] });

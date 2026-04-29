@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/types";
 
 interface ExerciseDetailDialogProps {
   exercise: ExerciseInfo | null;

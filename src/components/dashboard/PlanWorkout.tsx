@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, X, Search, GripVertical, StickyNote } from "lucide-react";
-import type { ExerciseInfo } from "@/data/mockData";
+import type { ExerciseInfo } from "@/data/types";
 import { fetchExerciseCatalogFromDb } from "@/lib/exercise-catalog";
 import { isSupabaseConfigured } from "@/lib/supabase";
 

@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { Workout } from "@/data/mockData";
+import type { Workout } from "@/data/types";
 import type { WorkoutPlan } from "@/components/dashboard/PlanWorkout";
 
 export interface UserProfile {
@@ -198,15 +198,3 @@ export async function deleteWorkoutPlan(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function insertWorkoutPlans(plans: Omit<WorkoutPlan, "id">[]): Promise<void> {
-  const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in");
-  const rows = plans.map((p) => ({
-    user_id: user.id,
-    name: p.name,
-    exercises: p.exercises,
-  }));
-  const { error } = await supabase.from("workout_plans").insert(rows);
-  if (error) throw error;
-}
