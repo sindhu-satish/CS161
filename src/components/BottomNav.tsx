@@ -11,7 +11,7 @@ const tabs = [
 
 const BottomNav = () => (
   <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md">
-    <div className="mx-auto flex max-w-md items-center justify-around py-2">
+    <div className="mx-auto flex w-full max-w-4xl items-center justify-around py-2">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}

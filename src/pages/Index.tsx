@@ -180,7 +180,7 @@ const Index = () => {
   if (view === "plan" && openedPlan) {
     return (
       <div className="min-h-screen bg-background pb-24">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto w-full max-w-4xl">
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm px-5 pt-5 pb-4 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
@@ -247,7 +247,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto w-full max-w-4xl">
         <DashboardHeader />
         <div className="flex flex-col gap-6 pb-6">
           <StartWorkoutCard onStart={handleStartEmpty} />

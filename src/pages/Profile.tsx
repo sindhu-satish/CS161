@@ -71,7 +71,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto w-full max-w-4xl">
         <header className="px-5 pt-6 pb-6">
           <h1 className="font-display text-2xl font-bold text-foreground">Profile</h1>
         </header>

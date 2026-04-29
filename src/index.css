@@ -86,7 +86,11 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 125%;
+  }
+
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased overflow-x-hidden;
   }
 }
