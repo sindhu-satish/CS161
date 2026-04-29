@@ -14,7 +14,9 @@
     "seed:exercises": "node scripts/import-exercises.mjs",
     "seed:exercises:force": "node scripts/import-exercises.mjs --force",
     "seed:exercises:rapid": "node scripts/import-exercises-rapid.mjs",
-    "seed:exercises:rapid:force": "node scripts/import-exercises-rapid.mjs --force"
+    "seed:exercises:rapid:force": "node scripts/import-exercises-rapid.mjs --force",
+    "seed:exercises:rapid:images": "node scripts/import-exercise-images-rapid.mjs",
+    "seed:exercises:rapid:images:force": "node scripts/import-exercise-images-rapid.mjs --force"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
