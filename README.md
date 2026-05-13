@@ -1,6 +1,48 @@
+**Repository:** [https://github.com/sindhu-satish/CS161](https://github.com/sindhu-satish/CS161)
+
 # FitTrack Pro
 
 Workout logging app (Vite + React + TypeScript) backed by **Supabase** for authentication and Postgres storage. Passwords are handled by Supabase Auth (hashed server-side), not stored in the client.
+
+## Repository structure
+
+### Folders (high level)
+
+| Folder | Purpose |
+| ------ | ------- |
+| **`public/`** | Static assets copied to the build output as-is (for example `robots.txt` and other public files the dev server serves at the site root). |
+| **`scripts/`** | Node scripts run from npm (exercise catalog import from API Ninjas, RapidAPI ExerciseDB, and related image import helpers). |
+| **`src/`** | Application source: React UI, routing, Supabase client usage, and tests. |
+| **`supabase/migrations/`** | Ordered SQL migrations: core schema, exercise catalogs, seeds, RLS, and incremental database changes. Run these in the Supabase SQL Editor (or your migration workflow) to match the app’s expectations. |
+
+### `src/` subfolders
+
+| Subfolder | Purpose |
+| --------- | ------- |
+| **`components/`** | Reusable UI: shared primitives under `components/ui/` (shadcn-style) and feature blocks under `components/dashboard/` plus app-specific components like navigation. |
+| **`pages/`** | Top-level route screens (login, dashboard, history, stats, exercises, profile, workout detail, not-found). |
+| **`lib/`** | Supabase client setup, database helpers, exercise catalog utilities, and small shared helpers (`utils.ts`). |
+| **`hooks/`** | React hooks (theme, mobile layout, toasts, etc.). |
+| **`context/`** | React context providers (for example authentication session state). |
+| **`data/`** | Shared TypeScript types and static data shapes used across the app. |
+| **`test/`** | Vitest setup and example tests. |
+
+Files at the root of **`src/`** (next to those folders): `main.tsx` mounts the React tree; `App.tsx` / `App.css` define the shell layout and routes; `index.css` holds global and Tailwind base styles; `vite-env.d.ts` augments TypeScript with Vite’s client types.
+
+### Root files (configuration and entry)
+
+| File | Purpose |
+| ---- | ------- |
+| **`index.html`** | HTML shell Vite injects the React bundle into. |
+| **`package.json` / `package-lock.json` / `bun.lock` / `bun.lockb`** | npm/Bun dependencies, scripts (`dev`, `build`, `test`, seed commands), and reproducible installs. |
+| **`vite.config.ts`** | Vite bundler and dev server configuration. |
+| **`vitest.config.ts`** | Unit test runner configuration (used with `npm run test`). |
+| **`tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`** | TypeScript compiler options for the app, tooling, and Node-side configs respectively. |
+| **`tailwind.config.ts`**, **`postcss.config.js`** | Tailwind CSS theme and PostCSS pipeline for styles. |
+| **`eslint.config.js`** | Lint rules (`npm run lint`). |
+| **`components.json`** | shadcn/ui generator metadata (component paths and style settings). |
+| **`.env.example`** | Template for required environment variable names (copy to `.env.local`). |
+| **`.gitignore`** | Paths excluded from version control (for example local env files and build output). |
 
 ## Prerequisites
 
